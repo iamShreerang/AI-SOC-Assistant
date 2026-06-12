@@ -32,9 +32,10 @@ The AI SOC Assistant collects, processes, analyzes, and monitors security logs i
 | Name | GitHub | Role |
 |---|---|---|
 | Shreerang Kolhe | [@iamShreerang](https://github.com/iamShreerang) | Backend + Integration |
-| Team Member 2 | — | Big Data Pipeline |
-| Team Member 3 | — | AI / ML |
-| Team Member 4 | — | Frontend |
+| Sayog Shendre | — | AI / ML |
+| Ayush Dandge | — | Big Data Pipeline |
+| Aryan Dandge | — | Frontend |
+| Sumiran Bagul | — | Database |
 
 ## Repository Structure
 
