@@ -1,7 +1,7 @@
 """AI SOC Assistant — FastAPI entry point."""
 
 from fastapi import FastAPI
-from backend.app.routes import health, logs, alerts, incidents
+from app.routes import health, logs, alerts, incidents
 
 app = FastAPI(
     title="AI SOC Assistant API",
