@@ -1,0 +1,639 @@
+{
+  "info": {
+    "name": "AI SOC Assistant API - Complete Test Suite",
+    "description": "Full end-to-end test suite for AI SOC Assistant backend.\n\n## Quick Start\n1. Import this collection into Postman\n2. Run the \"Complete User Flow\" folder in order\n3. JWT token is auto-captured after login\n\n## Variables\n- `base_url`: API base URL (default: http://localhost:8000)\n- `token`: JWT bearer token (auto-set on login)\n- `log_id`, `alert_id`, `incident_id`: Auto-captured from create responses\n\n## Test Coverage\n✅ Auth (register, login, /users/me)\n✅ Logs (CRUD + ingest)\n✅ Alerts (CRUD + status transitions + ingest)\n✅ Incidents (CRUD + LLM summary)\n✅ Negative cases (401, 404, 422)\n",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {"key": "base_url", "value": "http://localhost:8000", "type": "string"},
+    {"key": "token", "value": "", "type": "string"},
+    {"key": "log_id", "value": "", "type": "string"},
+    {"key": "alert_id", "value": "", "type": "string"},
+    {"key": "incident_id", "value": "", "type": "string"}
+  ],
+  "item": [
+    {
+      "name": "🚀 Complete User Flow (Run in order)",
+      "description": "Execute these requests in sequence to test the full happy path.",
+      "item": [
+        {
+          "name": "1️⃣ Register New User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has username and role', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('username');",
+                  "    pm.expect(json).to.have.property('role');",
+                  "    pm.expect(json.role).to.equal('analyst');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{base_url}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"postman_test_user\",\n  \"password\": \"SecurePass123!\",\n  \"role\": \"analyst\"\n}"
+            },
+            "description": "Register a new analyst user. Username must be unique."
+          }
+        },
+        {
+          "name": "2️⃣ Login (Auto-capture Token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has access_token', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('access_token');",
+                  "    pm.expect(json).to.have.property('token_type');",
+                  "    pm.expect(json.token_type).to.equal('bearer');",
+                  "});",
+                  "",
+                  "// Auto-capture JWT token for all subsequent requests",
+                  "const token = pm.response.json().access_token;",
+                  "pm.collectionVariables.set('token', token);",
+                  "console.log('✅ JWT token captured:', token.substring(0, 20) + '...');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{base_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"analyst\",\n  \"password\": \"analyst123\"\n}"
+            },
+            "description": "Login with pre-seeded analyst credentials. JWT token is auto-captured into {{token}} variable."
+          }
+        },
+        {
+          "name": "3️⃣ Verify Token - GET /users/me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('User identity matches login', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.username).to.equal('analyst');",
+                  "    pm.expect(json.role).to.equal('analyst');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": "{{base_url}}/auth/users/me",
+            "description": "Verify JWT token is valid and returns correct user identity."
+          }
+        },
+        {
+          "name": "4️⃣ Create Log Entry",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has log ID and ingested_at', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json).to.have.property('ingested_at');",
+                  "    pm.expect(json.source).to.equal('firewall-01');",
+                  "    pm.collectionVariables.set('log_id', json.id);",
+                  "    console.log('✅ Log ID captured:', json.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": "{{base_url}}/logs/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"firewall-01\",\n  \"severity\": \"high\",\n  \"message\": \"Blocked inbound connection from 198.51.100.42:4444 to 10.0.0.5:22\",\n  \"timestamp\": \"2024-06-01T14:32:00Z\",\n  \"raw\": \"Jun  1 14:32:00 fw01 kernel: DROP IN=eth0 SRC=198.51.100.42 DST=10.0.0.5 DPT=22\"\n}"
+            },
+            "description": "Create a firewall block log entry."
+          }
+        },
+        {
+          "name": "5️⃣ Get Log by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Log ID matches created log', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.id).to.equal(parseInt(pm.collectionVariables.get('log_id')));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": "{{base_url}}/logs/{{log_id}}",
+            "description": "Retrieve the log entry we just created."
+          }
+        },
+        {
+          "name": "6️⃣ List All Logs",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is an array', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.be.an('array');",
+                  "    pm.expect(json.length).to.be.greaterThan(0);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": "{{base_url}}/logs/?limit=50",
+            "description": "List all logs (limited to 50 entries)."
+          }
+        },
+        {
+          "name": "7️⃣ Create Alert",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Alert created with status open', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json.status).to.equal('open');",
+                  "    pm.collectionVariables.set('alert_id', json.id);",
+                  "    console.log('✅ Alert ID captured:', json.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": "{{base_url}}/alerts/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"SSH Brute Force Attack Detected\",\n  \"severity\": \"high\",\n  \"source\": \"auth-service\",\n  \"description\": \"15 failed SSH login attempts from 198.51.100.42 within 60 seconds\"\n}"
+            },
+            "description": "Create a brute-force alert."
+          }
+        },
+        {
+          "name": "8️⃣ Acknowledge Alert (PATCH)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Alert status updated to acknowledged', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.status).to.equal('acknowledged');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": "{{base_url}}/alerts/{{alert_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"acknowledged\"\n}"
+            },
+            "description": "Transition alert from 'open' to 'acknowledged'."
+          }
+        },
+        {
+          "name": "9️⃣ Create Incident",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Incident created with status open', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json.status).to.equal('open');",
+                  "    pm.expect(json.summary).to.be.null;",
+                  "    pm.collectionVariables.set('incident_id', json.id);",
+                  "    console.log('✅ Incident ID captured:', json.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": "{{base_url}}/incidents/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Coordinated Brute Force Campaign\",\n  \"description\": \"Multiple SSH brute-force attempts from different IPs targeting production servers\",\n  \"alert_ids\": [1]\n}"
+            },
+            "description": "Create an incident linking alert(s)."
+          }
+        },
+        {
+          "name": "🔟 Attach LLM Summary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Incident has summary attached', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.summary).to.not.be.null;",
+                  "    pm.expect(json.summary).to.include('Attacker');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{base_url}}/summaries",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"incident_id\": {{incident_id}},\n  \"summary\": \"Attacker(s) conducted a coordinated SSH brute-force campaign from 3 distinct IP addresses. Attack originated from known botnet infrastructure. Recommend immediate firewall rule update to block source IPs and enforce key-based authentication.\"\n}"
+            },
+            "description": "Simulate LLM module attaching an AI-generated summary (no auth required)."
+          }
+        },
+        {
+          "name": "1️⃣1️⃣ Verify Incident with Summary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Incident summary is present', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.summary).to.not.be.null;",
+                  "    pm.expect(json.summary.length).to.be.greaterThan(50);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": "{{base_url}}/incidents/{{incident_id}}",
+            "description": "Retrieve the incident and verify the LLM summary was attached."
+          }
+        }
+      ]
+    },
+    {
+      "name": "📦 Integration Endpoints (No Auth)",
+      "description": "Internal pipeline endpoints called by Kafka, ML, and LLM modules.",
+      "item": [
+        {
+          "name": "Kafka → Ingest Log",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Log ingested without auth', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('id');",
+                  "    pm.expect(json.source).to.equal('kafka-consumer');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{base_url}}/ingest/logs",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"kafka-consumer\",\n  \"severity\": \"info\",\n  \"message\": \"User login from 10.0.0.15\"\n}"
+            },
+            "description": "Kafka consumer forwards a log to the backend (no auth required)."
+          }
+        },
+        {
+          "name": "ML → Ingest Alert",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201 Created', () => {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Alert created by ML module', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.source).to.equal('ml-anomaly-detector');",
+                  "    pm.expect(json.status).to.equal('open');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{base_url}}/ingest/alerts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Anomalous Outbound Traffic Spike\",\n  \"severity\": \"critical\",\n  \"source\": \"ml-anomaly-detector\",\n  \"description\": \"Outbound bytes on eth0 exceeded 3σ threshold. Anomaly score: 0.987\"\n}"
+            },
+            "description": "ML module pushes an anomaly alert (no auth required)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "❌ Negative Test Cases",
+      "description": "Test error handling for invalid inputs, missing auth, and non-existent resources.",
+      "item": [
+        {
+          "name": "401 - Login with Wrong Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401 Unauthorized', () => {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Error detail present', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('detail');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{base_url}}/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"analyst\",\n  \"password\": \"WRONG_PASSWORD\"\n}"
+            },
+            "description": "Attempt login with incorrect password."
+          }
+        },
+        {
+          "name": "401 - Access Protected Endpoint Without Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401 Unauthorized', () => {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/logs/",
+            "description": "Try to access protected endpoint without Authorization header."
+          }
+        },
+        {
+          "name": "401 - Invalid JWT Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401 Unauthorized', () => {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer INVALID.TOKEN.HERE"}],
+            "url": "{{base_url}}/auth/users/me",
+            "description": "Use a malformed JWT token."
+          }
+        },
+        {
+          "name": "404 - Get Non-Existent Log",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404 Not Found', () => {",
+                  "    pm.response.to.have.status(404);",
+                  "});",
+                  "",
+                  "pm.test('Error detail present', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.detail).to.include('not found');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{token}}"}],
+            "url": "{{base_url}}/logs/99999",
+            "description": "Request a log ID that does not exist."
+          }
+        },
+        {
+          "name": "409 - Register Duplicate Username",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 409 Conflict', () => {",
+                  "    pm.response.to.have.status(409);",
+                  "});",
+                  "",
+                  "pm.test('Error mentions username taken', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.detail.toLowerCase()).to.include('taken');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{base_url}}/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"analyst\",\n  \"password\": \"pass123\"\n}"
+            },
+            "description": "Try to register with an existing username (analyst already exists)."
+          }
+        },
+        {
+          "name": "422 - Create Log with Missing Fields",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 422 Unprocessable Entity', () => {",
+                  "    pm.response.to.have.status(422);",
+                  "});",
+                  "",
+                  "pm.test('Validation error present', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json).to.have.property('detail');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Content-Type", "value": "application/json"},
+              {"key": "Authorization", "value": "Bearer {{token}}"}
+            ],
+            "url": "{{base_url}}/logs/",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source\": \"test\"\n}"
+            },
+            "description": "Missing required fields (severity, message)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏥 Health Check",
+      "item": [
+        {
+          "name": "GET /health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200 OK', () => {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Service is healthy', () => {",
+                  "    const json = pm.response.json();",
+                  "    pm.expect(json.status).to.equal('ok');",
+                  "    pm.expect(json).to.have.property('version');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{base_url}}/health",
+            "description": "Check API health status (no auth required)."
+          }
+        }
+      ]
+    }
+  ]
+}
