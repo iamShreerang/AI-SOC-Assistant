@@ -1,26 +1,29 @@
-"""Log ingestion service."""
+"""Log ingestion service — in-memory stub until DB layer is ready."""
+
+from datetime import datetime, timezone
+from typing import Optional
+
+from app.schemas.log import LogCreate, LogResponse
+
+_store: dict[int, LogResponse] = {}
+_counter = 0
 
 
-class LogService:
-    """Handles log storage and retrieval logic."""
+def create_log(payload: LogCreate) -> LogResponse:
+    global _counter
+    _counter += 1
+    entry = LogResponse(
+        **payload.model_dump(),
+        id=_counter,
+        ingested_at=datetime.now(timezone.utc),
+    )
+    _store[_counter] = entry
+    return entry
 
-    async def get_recent_logs(self, limit: int = 100):
-        """
-        Fetch recent logs from storage.
 
-        TODO:
-            - Query Elasticsearch / PostgreSQL
-            - Apply filters and pagination
-        """
-        pass
+def get_logs(limit: int = 100) -> list[LogResponse]:
+    return list(_store.values())[-limit:]
 
-    async def ingest(self, log_entry):
-        """
-        Store a log entry and publish to Kafka.
 
-        TODO:
-            - Validate schema
-            - Write to PostgreSQL
-            - Publish to kafka topic: raw-logs
-        """
-        pass
+def get_log_by_id(log_id: int) -> Optional[LogResponse]:
+    return _store.get(log_id)
