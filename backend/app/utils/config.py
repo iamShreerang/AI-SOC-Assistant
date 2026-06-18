@@ -9,6 +9,12 @@ class Settings(BaseSettings):
     app_name: str = "AI SOC Assistant"
     debug: bool = False
 
+    # Security / Authentication
+    secret_key: str = "change-this-in-production"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+    token_url: str = "/auth/login"
+
     # Database
     database_url: str = "postgresql://user:password@localhost:5432/soc_db"
 
