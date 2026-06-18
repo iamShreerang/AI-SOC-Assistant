@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     # Elasticsearch
     elasticsearch_url: str = "http://localhost:9200"
 
+    # LLM
+    groq_api_key: str = ""
+
     class Config:
         env_file = ".env"
 
