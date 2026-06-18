@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 router = APIRouter()
+ingest_router = APIRouter(prefix="/ingest")
 
 
 @router.get("/")
