@@ -3,6 +3,7 @@
 from fastapi import APIRouter
 
 router = APIRouter()
+summaries_router = APIRouter(prefix="/summaries")
 
 
 @router.get("/")
