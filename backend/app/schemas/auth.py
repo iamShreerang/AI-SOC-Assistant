@@ -54,12 +54,13 @@ class Token(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "examples": [
-                {"access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...", "token_type": "bearer"}
+                {"access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...", "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...", "token_type": "bearer"}
             ]
         }
     )
 
     access_token: str = Field(..., description="Signed JWT — include as `Authorization: Bearer <token>`")
+    refresh_token: str = Field(..., description="Refresh token — use at `POST /auth/refresh` to get a new access token")
     token_type: str = Field("bearer", description="Always `bearer`")
 
 

@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     algorithm: str = "HS256"
     allowed_algorithms: list[str] = ["HS256"]
     access_token_expire_minutes: int = 30
+    refresh_token_expire_days: int = 7
+    refresh_secret_key: str = "change-this-refresh-secret-in-production"
     token_url: str = "/auth/login"
 
     # Database
@@ -28,6 +30,13 @@ class Settings(BaseSettings):
 
     # LLM
     groq_api_key: str = ""
+
+    # OAuth2 Providers
+    google_client_id: str = ""
+    google_client_secret: str = ""
+    github_client_id: str = ""
+    github_client_secret: str = ""
+    oauth_redirect_uri: str = "http://localhost:8000/auth/callback"
 
     class Config:
         env_file = ".env"
