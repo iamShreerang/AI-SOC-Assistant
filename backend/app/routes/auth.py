@@ -1,8 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
 
 from app.schemas.auth import Token, UserLogin, UserRegister, UserResponse
-from app.services.auth_service import authenticate_user, generate_token, register_user
-from app.utils.security import get_current_active_user, TokenData
+from app.services.auth_service import authenticate_user, generate_token, register_user, get_or_create_oauth_user, _USERS
+from app.utils.security import get_current_active_user, TokenData, decode_refresh_token
+from app.utils.oauth import oauth
+from app.utils.config import settings
 
 router = APIRouter()
 
@@ -87,3 +91,57 @@ Requires a valid `Authorization: Bearer <token>` header.
 )
 def me(current_user: TokenData = Depends(get_current_active_user)):
     return UserResponse(username=current_user.username, role=current_user.role)
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+
+@router.post("/refresh", response_model=Token, summary="Refresh access token")
+def refresh(payload: RefreshRequest):
+    token_data = decode_refresh_token(payload.refresh_token)
+    if not token_data:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired refresh token",
+        )
+    user = _USERS.get(token_data.username)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    return generate_token(user)
+
+
+# ── OAuth Routes ──────────────────────────────────────────────────────────────
+
+@router.get("/login/google", summary="Redirect to Google OAuth")
+async def login_google(request: Request):
+    redirect_uri = str(request.url_for("auth_google_callback"))
+    return await oauth.google.authorize_redirect(request, redirect_uri)
+
+
+@router.get("/callback/google", name="auth_google_callback", summary="Google OAuth callback")
+async def auth_google_callback(request: Request):
+    token = await oauth.google.authorize_access_token(request)
+    user_info = token.get("userinfo")
+    if not user_info or not user_info.get("email"):
+        raise HTTPException(status_code=400, detail="Could not fetch user info from Google")
+    user = get_or_create_oauth_user(user_info["email"], "google")
+    return generate_token(user)
+
+
+@router.get("/login/github", summary="Redirect to GitHub OAuth")
+async def login_github(request: Request):
+    redirect_uri = str(request.url_for("auth_github_callback"))
+    return await oauth.github.authorize_redirect(request, redirect_uri)
+
+
+@router.get("/callback/github", name="auth_github_callback", summary="GitHub OAuth callback")
+async def auth_github_callback(request: Request):
+    token = await oauth.github.authorize_access_token(request)
+    resp = await oauth.github.get("https://api.github.com/user/emails", token=token)
+    emails = resp.json()
+    primary_email = next((e["email"] for e in emails if e.get("primary")), None)
+    if not primary_email:
+        raise HTTPException(status_code=400, detail="Could not fetch email from GitHub")
+    user = get_or_create_oauth_user(primary_email, "github")
+    return generate_token(user)

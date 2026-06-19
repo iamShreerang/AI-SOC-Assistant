@@ -1,6 +1,8 @@
 """AI SOC Assistant — FastAPI entry point."""
 
 from fastapi import FastAPI
+from starlette.middleware.sessions import SessionMiddleware
+from app.utils.config import settings
 
 from app.routes import health, auth
 from app.routes.logs import router as logs_router, ingest_router as logs_ingest_router
@@ -111,6 +113,8 @@ app = FastAPI(
         "url": "https://www.gnu.org/licenses/agpl-3.0.html",
     },
 )
+
+app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
 
 app.include_router(health.router, tags=["Health"])
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])

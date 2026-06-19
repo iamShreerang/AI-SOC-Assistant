@@ -29,6 +29,26 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return jwt.encode(payload, settings.secret_key, algorithm=settings.algorithm)
 
 
+def create_refresh_token(data: dict) -> str:
+    payload = data.copy()
+    payload["exp"] = datetime.now(timezone.utc) + timedelta(days=settings.refresh_token_expire_days)
+    payload["type"] = "refresh"
+    return jwt.encode(payload, settings.refresh_secret_key, algorithm=settings.algorithm)
+
+
+def decode_refresh_token(token: str) -> Optional[TokenData]:
+    try:
+        payload = jwt.decode(token, settings.refresh_secret_key, algorithms=settings.allowed_algorithms)
+        if payload.get("type") != "refresh":
+            return None
+        username = payload.get("sub")
+        if username is None:
+            return None
+        return TokenData(username=username, role=payload.get("role"))
+    except jwt.PyJWTError:
+        return None
+
+
 def decode_access_token(token: str) -> Optional[TokenData]:
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=settings.allowed_algorithms)

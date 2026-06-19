@@ -1,8 +1,9 @@
 from datetime import timedelta
 from typing import Optional
+import secrets
 
 from app.schemas.auth import Token, UserRegister, UserResponse
-from app.utils.security import hash_password, verify_password, create_access_token
+from app.utils.security import hash_password, verify_password, create_access_token, create_refresh_token
 
 # Mock in-memory user store — replace with DB lookup once schema is ready
 _USERS: dict[str, dict] = {
@@ -39,8 +40,20 @@ def authenticate_user(username: str, password: str) -> Optional[dict]:
 
 
 def generate_token(user: dict) -> Token:
-    token = create_access_token(
-        data={"sub": user["username"], "role": user["role"]},
-        expires_delta=timedelta(minutes=15),
+    data = {"sub": user["username"], "role": user["role"]}
+    return Token(
+        access_token=create_access_token(data, expires_delta=timedelta(minutes=15)),
+        refresh_token=create_refresh_token(data),
     )
-    return Token(access_token=token)
+
+
+def get_or_create_oauth_user(email: str, provider: str) -> dict:
+    """Find existing OAuth user by email or create a new one."""
+    username = f"{provider}_{email.split('@')[0]}"
+    if username not in _USERS:
+        _USERS[username] = {
+            "username": username,
+            "hashed_password": hash_password(secrets.token_urlsafe(16)),
+            "role": "analyst",
+        }
+    return _USERS[username]
