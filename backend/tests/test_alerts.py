@@ -54,7 +54,10 @@ def test_post_alert_unauthenticated(client):
 def test_get_alerts_returns_list(client, auth_headers):
     resp = client.get("/alerts/", headers=auth_headers)
     assert resp.status_code == 200
-    assert isinstance(resp.json(), list)
+    body = resp.json()
+    assert "alerts" in body
+    assert "total" in body
+    assert isinstance(body["alerts"], list)
 
 
 def test_get_alerts_unauthenticated(client):
