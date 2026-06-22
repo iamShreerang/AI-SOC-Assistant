@@ -1,13 +1,22 @@
 """AI SOC Assistant — FastAPI entry point."""
 
 from fastapi import FastAPI
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from app.utils.config import settings
+from app.utils.elasticsearch_client import create_indices, check_es_connection
 
 from app.routes import health, auth
 from app.routes.logs import router as logs_router, ingest_router as logs_ingest_router
 from app.routes.alerts import router as alerts_router, ingest_router as alerts_ingest_router
 from app.routes.incidents import router as incidents_router, summaries_router
+from app.routes import stats, search, export, audit
 
 _DESCRIPTION = """
 ## AI SOC Assistant API
@@ -59,7 +68,8 @@ tags_metadata = [
         "name": "Auth",
         "description": (
             "User registration, login, and identity. "
-            "Login returns a short-lived JWT bearer token used by all protected endpoints."
+            "Login returns a short-lived JWT bearer token used by all protected endpoints. "
+            "Admin users can manage other users via /auth/users endpoints."
         ),
     },
     {
@@ -67,6 +77,7 @@ tags_metadata = [
         "description": (
             "Security log ingestion and retrieval. "
             "Logs are raw or parsed entries from sources such as firewalls, IDS, and SIEM systems. "
+            "Supports filtering by severity and source with pagination. "
             "**Requires authentication.**"
         ),
     },
@@ -76,6 +87,8 @@ tags_metadata = [
             "Security alert management. "
             "Alerts are raised when a log pattern or ML model signals anomalous behaviour. "
             "Supports status transitions: `open` → `acknowledged` → `resolved`. "
+            "Supports filtering by severity, status, and source with pagination. "
+            "Includes bulk status update endpoint. "
             "**Requires authentication.**"
         ),
     },
@@ -85,6 +98,8 @@ tags_metadata = [
             "Incident lifecycle management. "
             "An incident groups one or more alerts into a tracked investigation case. "
             "Incidents can receive an AI-generated summary from the LLM module. "
+            "Supports status transitions: `open` → `in-progress` → `closed`. "
+            "Supports filtering by status with pagination. "
             "**Requires authentication.**"
         ),
     },
@@ -95,6 +110,38 @@ tags_metadata = [
             "Called exclusively by the Kafka consumer (`/ingest/logs`), "
             "ML anomaly detector (`/ingest/alerts`), and LLM summariser (`/summaries`). "
             "Do not expose these to end users."
+        ),
+    },
+    {
+        "name": "Statistics",
+        "description": (
+            "Dashboard analytics and statistics endpoints. "
+            "Provides summary metrics, activity trends, and breakdowns for visualization. "
+            "**Requires authentication.**"
+        ),
+    },
+    {
+        "name": "Search",
+        "description": (
+            "Full-text search across logs, alerts, and incidents. "
+            "Search by keywords in messages, titles, descriptions, and summaries. "
+            "**Requires authentication.**"
+        ),
+    },
+    {
+        "name": "Export",
+        "description": (
+            "Data export endpoints for logs, alerts, and incidents. "
+            "Supports CSV and JSON formats with optional filtering. "
+            "**Requires authentication.**"
+        ),
+    },
+    {
+        "name": "Audit",
+        "description": (
+            "Audit trail for administrative actions. "
+            "Tracks user management operations and system changes. "
+            "**Requires admin role.**"
         ),
     },
 ]
@@ -114,6 +161,23 @@ app = FastAPI(
     },
 )
 
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Rate limiter
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(
+    RateLimitExceeded,
+    lambda request, exc: JSONResponse(status_code=429, content={"detail": "Too many requests, slow down."})
+)
+app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(SessionMiddleware, secret_key=settings.secret_key)
 
 app.include_router(health.router, tags=["Health"])
@@ -122,7 +186,26 @@ app.include_router(logs_router, prefix="/logs", tags=["Logs"])
 app.include_router(alerts_router, prefix="/alerts", tags=["Alerts"])
 app.include_router(incidents_router, prefix="/incidents", tags=["Incidents"])
 
+# Statistics, Search, Export, and Audit endpoints
+app.include_router(stats.router, prefix="/stats", tags=["Statistics"])
+app.include_router(search.router, prefix="/search", tags=["Search"])
+app.include_router(export.router, prefix="/export", tags=["Export"])
+app.include_router(audit.router, prefix="/audit", tags=["Audit"])
+
 # Internal integration endpoints (no auth — pipeline use only)
 app.include_router(logs_ingest_router, tags=["Ingest"])
 app.include_router(alerts_ingest_router, tags=["Ingest"])
 app.include_router(summaries_router, tags=["Ingest"])
+
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize Elasticsearch on startup if enabled."""
+    if settings.elasticsearch_enabled:
+        if check_es_connection():
+            create_indices()
+            print("[OK] Elasticsearch initialized successfully")
+        else:
+            print("[WARNING] Elasticsearch not available - using in-memory storage")
+    else:
+        print("[INFO] Elasticsearch disabled - using in-memory storage")

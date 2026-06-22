@@ -4,7 +4,7 @@ import pytest
 # --- Registration ---
 
 def test_register_new_user(client):
-    resp = client.post("/auth/register", json={"username": "newuser", "password": "pass123"})
+    resp = client.post("/auth/register", json={"username": "newuser", "password": "password123"})
     assert resp.status_code == 201
     body = resp.json()
     assert body["username"] == "newuser"
@@ -12,14 +12,14 @@ def test_register_new_user(client):
 
 
 def test_register_custom_role(client):
-    resp = client.post("/auth/register", json={"username": "soc_admin", "password": "x", "role": "admin"})
+    resp = client.post("/auth/register", json={"username": "soc_admin", "password": "adminpass123", "role": "admin"})
     assert resp.status_code == 201
     assert resp.json()["role"] == "admin"
 
 
 def test_register_duplicate(client):
-    client.post("/auth/register", json={"username": "dupuser", "password": "pass"})
-    resp = client.post("/auth/register", json={"username": "dupuser", "password": "pass"})
+    client.post("/auth/register", json={"username": "dupuser", "password": "password123"})
+    resp = client.post("/auth/register", json={"username": "dupuser", "password": "password123"})
     assert resp.status_code == 409
 
 
