@@ -6,13 +6,13 @@ import pytest
 def test_post_log_minimal(client, auth_headers):
     resp = client.post(
         "/logs/",
-        json={"source": "firewall", "severity": "high", "message": "Port scan detected"},
+        json={"source": "firewall", "severity": "critical", "message": "Port scan detected"},
         headers=auth_headers,
     )
     assert resp.status_code == 201
     body = resp.json()
     assert body["source"] == "firewall"
-    assert body["severity"] == "high"
+    assert body["severity"] == "critical"
     assert body["message"] == "Port scan detected"
     assert "id" in body
     assert "ingested_at" in body
@@ -39,7 +39,7 @@ def test_post_log_with_optional_fields(client, auth_headers):
 def test_post_log_missing_required_field(client, auth_headers):
     resp = client.post(
         "/logs/",
-        json={"source": "firewall", "severity": "high"},   # missing message
+        json={"source": "firewall", "severity": "error"},   # missing message
         headers=auth_headers,
     )
     assert resp.status_code == 422
@@ -48,7 +48,7 @@ def test_post_log_missing_required_field(client, auth_headers):
 def test_post_log_unauthenticated(client):
     resp = client.post(
         "/logs/",
-        json={"source": "x", "severity": "low", "message": "test"},
+        json={"source": "x", "severity": "info", "message": "test"},
     )
     assert resp.status_code == 401
 
@@ -105,7 +105,7 @@ def test_get_log_not_found(client, auth_headers):
 def test_get_log_by_id_unauthenticated(client, auth_headers):
     create = client.post(
         "/logs/",
-        json={"source": "x", "severity": "low", "message": "y"},
+        json={"source": "x", "severity": "info", "message": "y"},
         headers=auth_headers,
     )
     log_id = create.json()["id"]
