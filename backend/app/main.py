@@ -1,5 +1,6 @@
 """AI SOC Assistant — FastAPI entry point."""
 
+import logging
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi.responses import JSONResponse
@@ -9,14 +10,19 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.sessions import SessionMiddleware
+
 from app.utils.config import settings
 from app.utils.elasticsearch_client import create_indices, check_es_connection
+from app.database import check_connection, create_tables, SessionLocal
+from app.services.db_auth_service import create_default_users
 
 from app.routes import health, auth
 from app.routes.logs import router as logs_router, ingest_router as logs_ingest_router
 from app.routes.alerts import router as alerts_router, ingest_router as alerts_ingest_router
 from app.routes.incidents import router as incidents_router, summaries_router
 from app.routes import stats, search, export, audit
+
+logger = logging.getLogger(__name__)
 
 _DESCRIPTION = """
 ## AI SOC Assistant API
@@ -200,12 +206,37 @@ app.include_router(summaries_router, tags=["Ingest"])
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize Elasticsearch on startup if enabled."""
+    """Initialize database and Elasticsearch on startup."""
+    # Check database connection
+    logger.info("Checking database connection...")
+    if not check_connection():
+        logger.error("Failed to connect to database. Check DATABASE_URL")
+        raise Exception("Database connection failed")
+    
+    logger.info("[OK] Database connected")
+    
+    # Create tables (development only - use Alembic in production)
+    try:
+        create_tables()
+        logger.info("[OK] Tables initialized")
+    except Exception as e:
+        logger.warning(f"Tables may already exist: {e}")
+    
+    # Create default users
+    try:
+        db = SessionLocal()
+        create_default_users(db)
+        db.close()
+        logger.info("[OK] Default users ready")
+    except Exception as e:
+        logger.error(f"User init failed: {e}")
+    
+    # Initialize Elasticsearch
     if settings.elasticsearch_enabled:
         if check_es_connection():
             create_indices()
-            print("[OK] Elasticsearch initialized successfully")
+            logger.info("[OK] Elasticsearch ready")
         else:
-            print("[WARNING] Elasticsearch not available - using in-memory storage")
+            logger.warning("[WARNING] Elasticsearch unavailable")
     else:
-        print("[INFO] Elasticsearch disabled - using in-memory storage")
+        logger.info("[INFO] Elasticsearch disabled")
