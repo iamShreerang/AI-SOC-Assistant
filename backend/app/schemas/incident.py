@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.enums import IncidentStatus
 
 
 class IncidentCreate(BaseModel):
@@ -46,7 +47,7 @@ class IncidentResponse(IncidentCreate):
     )
 
     id: int = Field(..., description="Auto-assigned incident ID")
-    status: str = Field(..., description="Incident status: `open` | `in-progress` | `closed`")
+    status: IncidentStatus = Field(..., description="Incident status: `open` | `in-progress` | `closed`")
     summary: Optional[str] = Field(None, description="AI-generated narrative summary (populated by LLM module via `POST /summaries`)")
     created_at: datetime = Field(..., description="UTC timestamp when the incident was opened")
 
@@ -68,3 +69,16 @@ class LLMSummary(BaseModel):
 
     incident_id: int = Field(..., description="ID of the incident to attach this summary to")
     summary: str = Field(..., description="LLM-generated narrative summary of the incident")
+
+
+class IncidentStatusUpdate(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "examples": [
+                {"summary": "Mark in progress", "value": {"status": "in-progress"}},
+                {"summary": "Close incident", "value": {"status": "closed"}},
+            ]
+        }
+    )
+
+    status: IncidentStatus = Field(..., description="New incident status: `open` | `in-progress` | `closed`")

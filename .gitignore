@@ -157,6 +157,12 @@ ENV/
 env.bak/
 venv.bak/
 
+# Backend environment files (NEVER COMMIT SECRETS!)
+backend/.env
+backend/.env.local
+*.env.local
+*.env.production
+
 # Spyder project settings
 .spyderproject
 .spyproject

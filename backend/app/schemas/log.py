@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.enums import LogSeverity
 
 
 class LogCreate(BaseModel):
@@ -30,7 +31,7 @@ class LogCreate(BaseModel):
     )
 
     source: str = Field(..., description="Originating system (e.g. `firewall-01`, `ids`, `siem`)")
-    severity: str = Field(..., description="Log severity: `info` | `warning` | `error` | `critical`")
+    severity: LogSeverity = Field(..., description="Log severity: `info` | `warning` | `error` | `critical`")
     message: str = Field(..., description="Human-readable log message")
     timestamp: Optional[datetime] = Field(None, description="Event time (ISO 8601). Defaults to ingestion time if omitted")
     raw: Optional[str] = Field(None, description="Original unparsed log line")

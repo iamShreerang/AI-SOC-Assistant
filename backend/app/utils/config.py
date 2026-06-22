@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     # Elasticsearch
     elasticsearch_url: str = "http://localhost:9200"
+    elasticsearch_enabled: bool = True  # Set to False to use in-memory storage
 
     # LLM
     groq_api_key: str = ""
@@ -37,6 +38,9 @@ class Settings(BaseSettings):
     github_client_id: str = ""
     github_client_secret: str = ""
     oauth_redirect_uri: str = "http://localhost:8000/auth/callback"
+
+    # CORS
+    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173", "http://localhost:8080"]
 
     class Config:
         env_file = ".env"

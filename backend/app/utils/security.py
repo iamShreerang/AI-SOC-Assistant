@@ -11,6 +11,17 @@ from app.utils.config import settings
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=settings.token_url)
 
+# In-memory token blacklist — replace with Redis in production
+_blacklist: set[str] = set()
+
+
+def blacklist_token(token: str) -> None:
+    _blacklist.add(token)
+
+
+def is_blacklisted(token: str) -> bool:
+    return token in _blacklist
+
 
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
@@ -61,6 +72,12 @@ def decode_access_token(token: str) -> Optional[TokenData]:
 
 
 def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenData:
+    if is_blacklisted(token):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has been revoked",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     token_data = decode_access_token(token)
     if token_data is None:
         raise HTTPException(
@@ -73,3 +90,14 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenData:
 
 def get_current_active_user(current_user: TokenData = Depends(get_current_user)) -> TokenData:
     return current_user
+
+
+def require_role(role: str):
+    def _check(current_user: TokenData = Depends(get_current_active_user)) -> TokenData:
+        if current_user.role != role:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Requires '{role}' role",
+            )
+        return current_user
+    return _check
