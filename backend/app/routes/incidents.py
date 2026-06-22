@@ -1,11 +1,22 @@
 """Incident management endpoints."""
 
 import logging
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
-from app.schemas.incident import IncidentCreate, IncidentResponse, LLMSummary
-from app.services import incident_service, llm_service
-from app.utils.security import get_current_active_user
+from app.schemas.incident import IncidentCreate, IncidentResponse, LLMSummary, IncidentStatusUpdate
+from app.schemas.enums import IncidentStatus
+from app.services import llm_service
+from app.utils.config import settings
+
+# Use Elasticsearch service if enabled, otherwise use in-memory
+if settings.elasticsearch_enabled:
+    from app.services import es_incident_service as incident_service
+else:
+    from app.services import incident_service
+
+from app.utils.security import get_current_active_user, require_role
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +24,25 @@ router = APIRouter()
 summaries_router = APIRouter(prefix="/summaries")
 
 
-@router.get("/", response_model=list[IncidentResponse])
-async def get_incidents(limit: int = 100, _user=Depends(get_current_active_user)):
-    return incident_service.get_incidents(limit)
+class IncidentListResponse(BaseModel):
+    """Paginated incident list response."""
+    incidents: list[IncidentResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+@router.get("/", response_model=IncidentListResponse)
+async def get_incidents(
+    limit: int = 100,
+    skip: int = 0,
+    status: Optional[IncidentStatus] = None,
+    _user=Depends(get_current_active_user),
+):
+    """Get incidents with optional filtering and pagination."""
+    incidents = incident_service.get_incidents(limit=limit, skip=skip, status=status)
+    total = incident_service.get_incidents_count(status=status)
+    return IncidentListResponse(incidents=incidents, total=total, skip=skip, limit=limit)
 
 
 @router.get("/{incident_id}", response_model=IncidentResponse)
@@ -41,6 +68,19 @@ async def create_incident(payload: IncidentCreate, _user=Depends(get_current_act
     except Exception as e:
         logger.warning(f"Summary generation failed for incident {incident.id}: {e}")
     
+    return incident
+
+
+@router.patch("/{incident_id}/status", response_model=IncidentResponse)
+async def update_incident_status(
+    incident_id: int,
+    payload: IncidentStatusUpdate,
+    _user=Depends(get_current_active_user),
+):
+    """Update incident status."""
+    incident = incident_service.update_incident_status(incident_id, payload.status)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
     return incident
 
 
