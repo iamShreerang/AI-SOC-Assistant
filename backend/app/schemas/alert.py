@@ -1,6 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.enums import AlertSeverity, AlertStatus
 
 
 class AlertCreate(BaseModel):
@@ -30,7 +31,7 @@ class AlertCreate(BaseModel):
     )
 
     title: str = Field(..., description="Short alert title")
-    severity: str = Field(..., description="Alert severity: `low` | `medium` | `high` | `critical`")
+    severity: AlertSeverity = Field(..., description="Alert severity: `low` | `medium` | `high` | `critical`")
     source: str = Field(..., description="Component that raised this alert (e.g. `waf`, `ids`, `ml-anomaly-detector`)")
     description: Optional[str] = Field(None, description="Extended description of the alert condition")
 
@@ -45,7 +46,7 @@ class AlertUpdate(BaseModel):
         }
     )
 
-    status: str = Field(..., description="New status: `open` | `acknowledged` | `resolved`")
+    status: AlertStatus = Field(..., description="New status: `open` | `acknowledged` | `resolved`")
 
 
 class AlertResponse(AlertCreate):
@@ -66,5 +67,5 @@ class AlertResponse(AlertCreate):
     )
 
     id: int = Field(..., description="Auto-assigned alert ID")
-    status: str = Field(..., description="Current alert status: `open` | `acknowledged` | `resolved`")
+    status: AlertStatus = Field(..., description="Current alert status: `open` | `acknowledged` | `resolved`")
     created_at: datetime = Field(..., description="UTC timestamp when the alert was created")

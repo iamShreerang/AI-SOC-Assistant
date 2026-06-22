@@ -1,18 +1,45 @@
 """Log ingestion and retrieval endpoints."""
 
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 
 from app.schemas.log import LogCreate, LogResponse
-from app.services import log_service
+from app.schemas.enums import LogSeverity
+from app.utils.config import settings
+
+# Use Elasticsearch service if enabled, otherwise use in-memory
+if settings.elasticsearch_enabled:
+    from app.services import es_log_service as log_service
+else:
+    from app.services import log_service
+
 from app.utils.security import get_current_active_user
 
 router = APIRouter()
 ingest_router = APIRouter(prefix="/ingest")
 
 
-@router.get("/", response_model=list[LogResponse])
-async def get_logs(limit: int = 100, _user=Depends(get_current_active_user)):
-    return log_service.get_logs(limit)
+class LogListResponse(BaseModel):
+    """Paginated log list response."""
+    logs: list[LogResponse]
+    total: int
+    skip: int
+    limit: int
+
+
+@router.get("/", response_model=LogListResponse)
+async def get_logs(
+    limit: int = 100,
+    skip: int = 0,
+    severity: Optional[LogSeverity] = None,
+    source: Optional[str] = None,
+    _user=Depends(get_current_active_user),
+):
+    """Get logs with optional filtering and pagination."""
+    logs = log_service.get_logs(limit=limit, skip=skip, severity=severity, source=source)
+    total = log_service.get_logs_count(severity=severity, source=source)
+    return LogListResponse(logs=logs, total=total, skip=skip, limit=limit)
 
 
 @router.get("/{log_id}", response_model=LogResponse)

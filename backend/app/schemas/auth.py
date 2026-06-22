@@ -1,5 +1,6 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
+from app.schemas.enums import UserRole
 
 
 class UserRegister(BaseModel):
@@ -20,7 +21,7 @@ class UserRegister(BaseModel):
 
     username: str = Field(..., min_length=3, max_length=50, description="Unique login handle")
     password: str = Field(..., min_length=1, description="Plain-text password (hashed before storage)")
-    role: str = Field("analyst", description="User role: `analyst` or `admin`")
+    role: UserRole = Field(UserRole.ANALYST, description="User role: `analyst` or `admin`")
 
 
 class UserLogin(BaseModel):
@@ -42,12 +43,13 @@ class UserLogin(BaseModel):
 class UserResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
-            "examples": [{"username": "jsmith", "role": "analyst"}]
+            "examples": [{"username": "jsmith", "role": "analyst", "is_active": True}]
         }
     )
 
     username: str
-    role: str
+    role: UserRole
+    is_active: bool = True
 
 
 class Token(BaseModel):
@@ -67,3 +69,9 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
     role: Optional[str] = None
+
+
+class UserUpdate(BaseModel):
+    """Schema for admin to update user details."""
+    role: Optional[UserRole] = Field(None, description="New role: `analyst` or `admin`")
+    is_active: Optional[bool] = Field(None, description="Active status")
