@@ -53,7 +53,10 @@ def test_post_incident_unauthenticated(client):
 def test_get_incidents_returns_list(client, auth_headers):
     resp = client.get("/incidents/", headers=auth_headers)
     assert resp.status_code == 200
-    assert isinstance(resp.json(), list)
+    body = resp.json()
+    assert "incidents" in body
+    assert "total" in body
+    assert isinstance(body["incidents"], list)
 
 
 def test_get_incidents_unauthenticated(client):

@@ -58,7 +58,10 @@ def test_post_log_unauthenticated(client):
 def test_get_logs_returns_list(client, auth_headers):
     resp = client.get("/logs/", headers=auth_headers)
     assert resp.status_code == 200
-    assert isinstance(resp.json(), list)
+    body = resp.json()
+    assert "logs" in body
+    assert "total" in body
+    assert isinstance(body["logs"], list)
 
 
 def test_get_logs_limit_param(client, auth_headers, reset_stores):
@@ -70,7 +73,9 @@ def test_get_logs_limit_param(client, auth_headers, reset_stores):
         )
     resp = client.get("/logs/?limit=3", headers=auth_headers)
     assert resp.status_code == 200
-    assert len(resp.json()) == 3
+    body = resp.json()
+    assert len(body["logs"]) == 3
+    assert body["total"] == 5
 
 
 def test_get_logs_unauthenticated(client):
