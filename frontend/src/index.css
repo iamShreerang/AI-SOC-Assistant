@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-soc-border;
+  }
+  
+  body {
+    @apply bg-soc-bg-primary text-soc-text-primary font-sans antialiased;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+}
+
+@layer components {
+  .cyber-gradient {
+    @apply bg-gradient-to-br from-soc-accent-cyan/10 to-soc-accent-blue/10;
+  }
+
+  .cyber-border {
+    @apply border border-soc-border/50 hover:border-soc-accent-cyan/50 transition-colors;
+  }
+
+  .glow-text {
+    text-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    @apply bg-soc-bg-secondary;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    @apply bg-soc-border rounded-full hover:bg-soc-accent-cyan/50;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
