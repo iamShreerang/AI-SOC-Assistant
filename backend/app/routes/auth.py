@@ -3,20 +3,11 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy.orm import Session
 
 from app.schemas.auth import Token, UserLogin, UserRegister, UserResponse, UserUpdate
-from app.services.auth_service import (
-    authenticate_user,
-    generate_token,
-    register_user,
-    get_or_create_oauth_user,
-    get_all_users,
-    get_user_by_username,
-    update_user,
-    delete_user,
-    _USERS,
-)
-from app.services import audit_service
+from app.services import db_auth_service, db_audit_service
+from app.database import get_db
 from app.utils.security import (
     get_current_active_user,
     TokenData,
@@ -60,18 +51,19 @@ Create a new user account with a hashed password.
     },
 )
 @limiter.limit("5/minute")
-def register(request: Request, payload: UserRegister):
+def register(request: Request, payload: UserRegister, db: Session = Depends(get_db)):
     # Validate password strength
     is_valid, error_msg = validate_password_simple(payload.password)
     if not is_valid:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_msg)
     
-    user = register_user(payload)
+    user = db_auth_service.register_user(db, payload)
     if user is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already taken")
     
     # Audit log
-    audit_service.log_action(
+    db_audit_service.log_action(
+        db,
         username="system",
         action="user.register",
         resource_type="user",
@@ -106,15 +98,15 @@ Returns `401 Unauthorized` if credentials are invalid.
     },
 )
 @limiter.limit("10/minute")
-def login(request: Request, credentials: UserLogin):
-    user = authenticate_user(credentials.username, credentials.password)
+def login(request: Request, credentials: UserLogin, db: Session = Depends(get_db)):
+    user = db_auth_service.authenticate_user(db, credentials.username, credentials.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    return generate_token(user)
+    return db_auth_service.generate_token(user)
 
 
 @router.get(
@@ -142,17 +134,17 @@ class RefreshRequest(BaseModel):
 
 @router.post("/refresh", response_model=Token, summary="Refresh access token")
 @limiter.limit("10/minute")
-def refresh(request: Request, payload: RefreshRequest):
+def refresh(request: Request, payload: RefreshRequest, db: Session = Depends(get_db)):
     token_data = decode_refresh_token(payload.refresh_token)
     if not token_data:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired refresh token",
         )
-    user = _USERS.get(token_data.username)
+    user = db_auth_service.get_user_by_username_internal(db, token_data.username)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    return generate_token(user)
+    return db_auth_service.generate_token(user)
 
 
 @router.post("/logout", status_code=200, summary="Logout and revoke token")
@@ -170,13 +162,13 @@ async def login_google(request: Request):
 
 
 @router.get("/callback/google", name="auth_google_callback", summary="Google OAuth callback")
-async def auth_google_callback(request: Request):
+async def auth_google_callback(request: Request, db: Session = Depends(get_db)):
     token = await oauth.google.authorize_access_token(request)
     user_info = token.get("userinfo")
     if not user_info or not user_info.get("email"):
         raise HTTPException(status_code=400, detail="Could not fetch user info from Google")
-    user = get_or_create_oauth_user(user_info["email"], "google")
-    return generate_token(user)
+    user = db_auth_service.get_or_create_oauth_user(db, user_info["email"], "google")
+    return db_auth_service.generate_token(user)
 
 
 @router.get("/login/github", summary="Redirect to GitHub OAuth")
@@ -186,15 +178,15 @@ async def login_github(request: Request):
 
 
 @router.get("/callback/github", name="auth_github_callback", summary="GitHub OAuth callback")
-async def auth_github_callback(request: Request):
+async def auth_github_callback(request: Request, db: Session = Depends(get_db)):
     token = await oauth.github.authorize_access_token(request)
     resp = await oauth.github.get("https://api.github.com/user/emails", token=token)
     emails = resp.json()
     primary_email = next((e["email"] for e in emails if e.get("primary")), None)
     if not primary_email:
         raise HTTPException(status_code=400, detail="Could not fetch email from GitHub")
-    user = get_or_create_oauth_user(primary_email, "github")
-    return generate_token(user)
+    user = db_auth_service.get_or_create_oauth_user(db, primary_email, "github")
+    return db_auth_service.generate_token(user)
 
 
 # ── Admin User Management Routes ──────────────────────────────────────────────
@@ -209,8 +201,8 @@ async def auth_github_callback(request: Request):
         403: {"description": "Requires admin role"},
     },
 )
-def list_users(_admin=Depends(require_role("admin"))):
-    return get_all_users()
+def list_users(db: Session = Depends(get_db), _admin=Depends(require_role("admin"))):
+    return db_auth_service.get_all_users(db)
 
 
 @router.get(
@@ -224,8 +216,8 @@ def list_users(_admin=Depends(require_role("admin"))):
         404: {"description": "User not found"},
     },
 )
-def get_user(username: str, _admin=Depends(require_role("admin"))):
-    user = get_user_by_username(username)
+def get_user(username: str, db: Session = Depends(get_db), _admin=Depends(require_role("admin"))):
+    user = db_auth_service.get_user_by_username(db, username)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
@@ -242,13 +234,19 @@ def get_user(username: str, _admin=Depends(require_role("admin"))):
         404: {"description": "User not found"},
     },
 )
-def update_user_endpoint(username: str, payload: UserUpdate, current_user: TokenData = Depends(require_role("admin"))):
-    user = update_user(username, payload)
+def update_user_endpoint(
+    username: str,
+    payload: UserUpdate,
+    db: Session = Depends(get_db),
+    current_user: TokenData = Depends(require_role("admin"))
+):
+    user = db_auth_service.update_user(db, username, payload)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
     # Audit log
-    audit_service.log_action(
+    db_audit_service.log_action(
+        db,
         username=current_user.username,
         action="user.update",
         resource_type="user",
@@ -270,8 +268,12 @@ def update_user_endpoint(username: str, payload: UserUpdate, current_user: Token
         404: {"description": "User not found"},
     },
 )
-def delete_user_endpoint(username: str, current_user: TokenData = Depends(require_role("admin"))):
-    success = delete_user(username)
+def delete_user_endpoint(
+    username: str,
+    db: Session = Depends(get_db),
+    current_user: TokenData = Depends(require_role("admin"))
+):
+    success = db_auth_service.delete_user(db, username)
     if not success:
         raise HTTPException(
             status_code=403,
@@ -279,7 +281,8 @@ def delete_user_endpoint(username: str, current_user: TokenData = Depends(requir
         )
     
     # Audit log
-    audit_service.log_action(
+    db_audit_service.log_action(
+        db,
         username=current_user.username,
         action="user.delete",
         resource_type="user",
