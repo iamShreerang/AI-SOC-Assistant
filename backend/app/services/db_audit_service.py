@@ -4,23 +4,24 @@ from datetime import datetime
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from pydantic import BaseModel
 
 from app.models.database import AuditLog
 
 
-class AuditLogEntry:
+class AuditLogEntry(BaseModel):
     """Audit log entry model for API responses."""
-    def __init__(self, id: int, timestamp: datetime, username: str, action: str,
-                 resource_type: str, resource_id: Optional[str], details: Optional[str],
-                 ip_address: Optional[str]):
-        self.id = id
-        self.timestamp = timestamp
-        self.username = username
-        self.action = action
-        self.resource_type = resource_type
-        self.resource_id = resource_id
-        self.details = details
-        self.ip_address = ip_address
+    id: int
+    timestamp: datetime
+    username: str
+    action: str
+    resource_type: str
+    resource_id: Optional[str] = None
+    details: Optional[str] = None
+    ip_address: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
 
 
 def log_action(
@@ -48,16 +49,7 @@ def log_action(
     db.commit()
     db.refresh(db_audit)
     
-    return AuditLogEntry(
-        id=db_audit.id,
-        timestamp=db_audit.timestamp,
-        username=db_audit.username,
-        action=db_audit.action,
-        resource_type=db_audit.resource_type,
-        resource_id=db_audit.resource_id,
-        details=db_audit.details,
-        ip_address=db_audit.ip_address,
-    )
+    return AuditLogEntry.model_validate(db_audit)
 
 
 def get_audit_logs(
@@ -82,19 +74,7 @@ def get_audit_logs(
     # Order by most recent first and apply pagination
     logs = query.order_by(AuditLog.timestamp.desc()).offset(skip).limit(limit).all()
     
-    return [
-        AuditLogEntry(
-            id=log.id,
-            timestamp=log.timestamp,
-            username=log.username,
-            action=log.action,
-            resource_type=log.resource_type,
-            resource_id=log.resource_id,
-            details=log.details,
-            ip_address=log.ip_address,
-        )
-        for log in logs
-    ]
+    return [AuditLogEntry.model_validate(log) for log in logs]
 
 
 def get_audit_logs_count(

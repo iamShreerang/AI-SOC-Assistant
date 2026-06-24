@@ -1,43 +1,82 @@
 # AI SOC Assistant - Frontend
 
-> Modern React 19 + TypeScript SOC Dashboard with real-time security monitoring
+> Modern React-based Security Operations Center dashboard with real-time monitoring, alert management, and ML analytics.
 
-## 🚀 Features
+## Tech Stack
 
-- **Modern Tech Stack**: React 19, TypeScript, Tailwind CSS, Recharts
-- **Authentication**: JWT-based auth with automatic token refresh
-- **Real-time Dashboard**: Live statistics and security event monitoring
-- **Dark Cybersecurity Theme**: Professional SOC appearance with blue/cyan accents
-- **Responsive Design**: Desktop-first with mobile support
-- **Accessibility**: WCAG 2.2 AA compliant
-- **State Management**: Zustand for global state
-- **API Integration**: Axios with interceptors for FastAPI backend
+- **React 19** - UI Library
+- **TypeScript** - Type Safety
+- **Tailwind CSS** - Styling
+- **Recharts** - Data Visualization
+- **Axios** - HTTP Client
+- **Zustand** - State Management
+- **React Router** - Routing
+- **Vite** - Build Tool
 
-## 📁 Project Structure
+## Features
+
+### Authentication
+- ✅ Login with JWT
+- ✅ User Registration
+- ✅ Password Reset
+- ✅ Role-based Access Control
+- ✅ Protected Routes
+
+### Dashboard
+- ✅ Real-time Statistics
+- ✅ System Health Monitoring
+- ✅ Interactive Charts
+- ✅ Alert Severity Distribution
+- ✅ Event Timeline
+
+### Real-Time Monitoring
+- ✅ Live Event Stream
+- ✅ Auto-refresh (5s intervals)
+- ✅ Event Filtering
+- ✅ Severity Indicators
+
+### Alert Management
+- ✅ Alert Table with Sorting
+- ✅ Status Updates (Open → Acknowledged → Resolved)
+- ✅ Severity Filtering
+- ✅ Alert Details View
+
+### Incident Management
+- ✅ Incident Tracking
+- ✅ AI-Generated Summaries
+- ✅ Alert Correlation
+- ✅ Status Workflow
+
+### ML Analytics
+- ✅ Anomaly Detection Results
+- ✅ Threat Classification
+- ✅ Confidence Scores
+- ✅ Model Accuracy Metrics
+
+### Log Explorer
+- ✅ Advanced Search
+- ✅ Severity Filtering
+- ✅ Raw Log Viewing
+- ✅ Export to CSV
+
+### Settings
+- ✅ Profile Management
+- ✅ Notification Preferences
+- ✅ Auto-refresh Configuration
+
+## Project Structure
 
 ```
 frontend/
 ├── src/
 │   ├── components/
-│   │   ├── ui/              # Reusable UI components
-│   │   │   ├── Button.tsx
-│   │   │   ├── Card.tsx
-│   │   │   ├── Input.tsx
-│   │   │   ├── Badge.tsx
-│   │   │   ├── Spinner.tsx
-│   │   │   └── Alert.tsx
-│   │   ├── layout/          # Layout components
-│   │   │   ├── Sidebar.tsx
-│   │   │   ├── TopNav.tsx
-│   │   │   └── MainLayout.tsx
-│   │   └── dashboard/       # Dashboard components
-│   │       ├── StatCard.tsx
-│   │       └── SystemHealth.tsx
-│   ├── pages/               # Page components
-│   │   ├── auth/
-│   │   │   ├── Login.tsx
-│   │   │   ├── Register.tsx
-│   │   │   └── ForgotPassword.tsx
+│   │   ├── charts/         # Chart components
+│   │   ├── dashboard/      # Dashboard-specific components
+│   │   ├── layout/         # Layout components (Sidebar, TopNav)
+│   │   └── ui/             # Reusable UI components
+│   ├── hooks/              # Custom React hooks
+│   ├── pages/              # Page components
+│   │   ├── auth/           # Authentication pages
 │   │   ├── Dashboard.tsx
 │   │   ├── Monitoring.tsx
 │   │   ├── Alerts.tsx
@@ -45,34 +84,28 @@ frontend/
 │   │   ├── MLAnalytics.tsx
 │   │   ├── LogExplorer.tsx
 │   │   └── Settings.tsx
-│   ├── services/            # API services
-│   │   └── api.ts
-│   ├── store/               # State management
-│   │   └── index.ts
-│   ├── types/               # TypeScript types
-│   │   └── index.ts
-│   ├── utils/               # Utility functions
-│   │   └── helpers.ts
-│   ├── App.tsx              # Main app with routing
-│   ├── main.tsx             # Entry point
-│   └── index.css            # Global styles
-├── public/
+│   ├── services/           # API service layer
+│   ├── store/              # Zustand stores
+│   ├── types/              # TypeScript type definitions
+│   ├── utils/              # Helper functions
+│   ├── App.tsx             # Main app component
+│   ├── main.tsx            # Entry point
+│   └── index.css           # Global styles
 ├── index.html
 ├── package.json
-├── tsconfig.json
 ├── tailwind.config.js
-├── vite.config.ts
-└── README.md
+├── tsconfig.json
+└── vite.config.ts
 ```
 
-## 🛠️ Installation
+## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ and npm
-- Backend API running on `http://localhost:8000`
+- Node.js 20+
+- npm or yarn
 
-### Setup
+### Installation
 
 ```bash
 # Navigate to frontend directory
@@ -84,340 +117,205 @@ npm install
 # Create environment file
 cp .env.example .env
 
-# Edit .env with your API URL
+# Update .env with your backend API URL
 # VITE_API_BASE_URL=http://localhost:8000
+```
 
+### Development
+
+```bash
 # Start development server
 npm run dev
+
+# The app will open at http://localhost:3000
 ```
 
-The app will open at `http://localhost:3000`
-
-## 📦 Available Scripts
+### Build
 
 ```bash
-# Development
-npm run dev          # Start dev server with hot reload
+# Type check
+npm run type-check
 
-# Build
-npm run build        # Build for production
-npm run preview      # Preview production build
+# Build for production
+npm run build
 
-# Code Quality
-npm run lint         # Run ESLint
-npm run type-check   # TypeScript type checking
+# Preview production build
+npm run preview
 ```
 
-## 🎨 Design System
+## Environment Variables
 
-### Color Palette
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `VITE_API_BASE_URL` | Backend API URL | `http://localhost:8000` |
 
-#### Backgrounds
-- Primary: `#0a0e17`
-- Secondary: `#111827`
-- Tertiary: `#1f2937`
+## Component Overview
 
-#### Accent Colors
-- Cyan: `#06b6d4`
-- Blue: `#3b82f6`
-- Purple: `#8b5cf6`
+### UI Components
 
-#### Severity Colors
-- Critical: `#dc2626`
-- High: `#ea580c`
-- Medium: `#f59e0b`
-- Low: `#10b981`
+- **Button** - Primary, secondary, danger, ghost variants
+- **Card** - Container for dashboard sections
+- **Input** - Form input with error handling
+- **Badge** - Status and severity indicators
+- **Spinner** - Loading states
+- **Alert** - Notification messages
 
-### Typography
+### Charts
 
-- Font Family: Inter (sans-serif)
-- Sizes: xs (0.75rem) to 4xl (2.25rem)
+- **DonutChart** - Severity distribution
+- **BarChart** - Log counts by type
+- **LineChart** - Time series data
+- **AreaChart** - Trend visualization
 
-### Components
+### Layout
 
-#### Button
-```tsx
-<Button variant="primary" size="md" onClick={handleClick}>
-  Click Me
-</Button>
-```
-Variants: `primary | secondary | danger | ghost | outline`
+- **MainLayout** - App wrapper with sidebar and topnav
+- **Sidebar** - Navigation menu
+- **TopNav** - Search, notifications, user menu
 
-#### Card
-```tsx
-<Card>
-  <CardHeader>
-    <CardTitle>Title</CardTitle>
-  </CardHeader>
-  <CardContent>Content</CardContent>
-</Card>
-```
+## State Management
 
-#### Badge
-```tsx
-<Badge variant="severity" severity="critical">Critical</Badge>
-<Badge variant="status" status="open">Open</Badge>
-```
+### Stores (Zustand)
 
-## 🔌 API Integration
+- **authStore** - User authentication state
+- **notificationStore** - In-app notifications
+- **settingsStore** - User preferences
+- **uiStore** - UI state (sidebar, modals)
 
-### Configuration
+## API Integration
 
-The app uses environment variables for API configuration:
+All API calls are centralized in `src/services/api.ts`:
 
-```env
-VITE_API_BASE_URL=http://localhost:8000
-```
-
-### Authentication Flow
-
-1. User logs in via `/auth/login`
-2. JWT tokens stored in localStorage and Zustand
-3. Tokens automatically added to API requests
-4. Auto-refresh on 401 errors
-5. Redirect to login on authentication failure
-
-### API Service
-
-```tsx
+```typescript
+// Example usage
 import { apiService } from '@/services/api';
 
-// Get dashboard stats
-const stats = await apiService.getDashboardSummary();
-
-// Get alerts with filters
-const alerts = await apiService.getAlerts({ 
-  severity: 'high', 
-  limit: 10 
-});
-
-// Create incident
-const incident = await apiService.createIncident({
-  title: 'Security Breach',
-  alert_ids: [1, 2, 3]
-});
+const alerts = await apiService.getAlerts({ severity: 'critical' });
+const summary = await apiService.getDashboardSummary();
 ```
 
-## 📊 Pages
+## Custom Hooks
 
-### Dashboard (`/dashboard`)
-- Real-time statistics cards
-- Alert severity distribution (Pie chart)
-- Alert status overview (Bar chart)
-- Events timeline (Line chart)
-- System health indicators
-- Recent alerts feed
+- **useFetch** - Data fetching with loading/error states
+- **usePolling** - Auto-refresh data at intervals
+- **useDebounce** - Debounce input values
 
-### Monitoring (`/monitoring`)
-- Live security event stream
-- Auto-refresh functionality
-- Event filtering and search
+## Styling
 
-### Alerts (`/alerts`)
-- Sortable alert table
-- Status filters
-- Bulk actions
-- Alert detail view
+### Tailwind Configuration
 
-### Incidents (`/incidents`)
-- Incident management
-- AI-generated summaries
-- Alert associations
-- Status tracking
+Custom color palette for cybersecurity theme:
 
-### ML Analytics (`/ml-analytics`)
-- Anomaly detection results
-- Prediction confidence scores
-- Model performance metrics
+- `soc-bg-*` - Background colors
+- `soc-accent-*` - Accent colors (cyan, blue, purple)
+- `soc-text-*` - Text colors
+- `severity-*` - Severity-based colors (critical, high, medium, low)
 
-### Log Explorer (`/logs`)
-- Full-text search
-- Advanced filters
-- Log details
-- Export functionality
+### Custom Classes
 
-### Settings (`/settings`)
-- Profile management
-- Notification preferences
-- Theme settings
-- Auto-refresh configuration
+- `.cyber-gradient` - Gradient background
+- `.cyber-border` - Animated border
+- `.glow-text` - Text shadow effect
+- `.scrollbar-thin` - Custom scrollbar
 
-## 🔐 Authentication
+## Accessibility
 
-### Demo Credentials
+- WCAG 2.2 AA Compliant
+- Semantic HTML
+- ARIA labels
+- Keyboard navigation
+- High contrast colors
+- Focus indicators
 
-**Analyst Account:**
-- Username: `analyst`
-- Password: `analyst123`
+## Browser Support
 
-**Admin Account:**
-- Username: `admin`
-- Password: `admin123`
+- Chrome/Edge (latest)
+- Firefox (latest)
+- Safari (latest)
 
-### Protected Routes
+## Performance
 
-All routes except `/login`, `/register`, and `/forgot-password` require authentication.
+- Code splitting with React.lazy
+- Memoization with useMemo/useCallback
+- Optimized re-renders
+- Virtual scrolling for large lists
+- Image optimization
 
-## 🎯 State Management
-
-### Zustand Stores
-
-```tsx
-import { useAuthStore, useNotificationStore, useUIStore } from '@/store';
-
-// Auth
-const { user, setAuth, clearAuth } = useAuthStore();
-
-// Notifications
-const { notifications, addNotification } = useNotificationStore();
-
-// UI State
-const { sidebarOpen, toggleSidebar } = useUIStore();
-```
-
-## 🧪 Testing
+## Testing
 
 ```bash
-# Run tests (when configured)
-npm run test
-
-# Type checking
+# Run type checks
 npm run type-check
+
+# Lint code
+npm run lint
 ```
 
-## 🚀 Deployment
+## Deployment
 
-### Build for Production
+### Build Output
 
 ```bash
 npm run build
+# Output: dist/
 ```
 
-Output will be in the `dist/` directory.
+### Serve Static Files
 
-### Environment Variables
+Deploy the `dist/` folder to any static hosting service:
 
-Set these in your production environment:
-
-```env
-VITE_API_BASE_URL=https://api.your-domain.com
-```
-
-### Deploy to Static Hosting
-
-The built files can be deployed to:
 - Vercel
 - Netlify
 - AWS S3 + CloudFront
-- Any static file server
+- Nginx
 
-## 🎨 Customization
+## Backend Integration
 
-### Theme Colors
-
-Edit `tailwind.config.js` to customize colors:
-
-```js
-colors: {
-  'soc-accent': {
-    cyan: '#06b6d4',  // Change this
-  }
-}
-```
-
-### API Base URL
-
-Update `.env`:
-
-```env
-VITE_API_BASE_URL=http://your-api-url
-```
-
-## 📝 Development Guidelines
-
-### Component Structure
-
-```tsx
-import { FC } from 'react';
-
-interface ComponentProps {
-  title: string;
-}
-
-export const Component: FC<ComponentProps> = ({ title }) => {
-  return <div>{title}</div>;
-};
-```
-
-### TypeScript
-
-- Use strict mode
-- Define interfaces for all props
-- Avoid `any` type
-- Leverage type inference
-
-### Styling
-
-- Use Tailwind utility classes
-- Follow mobile-first approach
-- Use design tokens from config
-- Maintain consistent spacing
-
-## 🔧 Troubleshooting
-
-### Cannot connect to API
-
-Check:
-1. Backend is running on `http://localhost:8000`
-2. `.env` file has correct `VITE_API_BASE_URL`
-3. CORS is configured on backend
-
-### Build errors
+Ensure the backend API is running at the URL specified in `.env`:
 
 ```bash
-# Clear node_modules and reinstall
+# Backend should be running at
+http://localhost:8000
+
+# API endpoints used:
+/auth/login
+/auth/register
+/alerts
+/incidents
+/logs
+/stats/summary
+```
+
+## Troubleshooting
+
+### CORS Issues
+
+If you encounter CORS errors, ensure the backend has CORS enabled for your frontend URL.
+
+### Authentication Errors
+
+Check that tokens are being stored correctly in localStorage and the Authorization header is set.
+
+### Build Errors
+
+```bash
+# Clear cache and reinstall
 rm -rf node_modules package-lock.json
 npm install
-
-# Clear Vite cache
-rm -rf node_modules/.vite
 ```
 
-### TypeScript errors
+## Contributing
 
-```bash
-# Run type check
-npm run type-check
-```
+1. Create feature branch from `frontend` branch
+2. Follow naming convention: `feature/frontend/<feature-name>`
+3. Ensure type safety (no TypeScript errors)
+4. Test all routes and features
+5. Submit PR with detailed description
 
-## 📚 Resources
+## License
 
-- [React Documentation](https://react.dev)
-- [TypeScript](https://www.typescriptlang.org/)
-- [Tailwind CSS](https://tailwindcss.com/)
-- [Recharts](https://recharts.org/)
-- [Vite](https://vitejs.dev/)
+AGPL-3.0 - See [LICENSE](../LICENSE)
 
-## 🤝 Contributing
+## Support
 
-1. Follow the component structure
-2. Use TypeScript strictly
-3. Follow accessibility guidelines
-4. Test before committing
-
-## 📄 License
-
-GNU Affero General Public License v3.0
-
-## 👥 Team
-
-- **Shreerang Kolhe** - Backend + Integration
-- **Aryan Dandge** - Frontend
-- **Sayog Shendre** - AI/ML
-- **Ayush Dandge** - Big Data Pipeline
-- **Sumiran Bagul** - Database
-
----
-
-**Status**: ✅ Foundation Complete
-**Version**: 1.0.0
+For issues or questions, please open an issue on GitHub.
