@@ -59,10 +59,11 @@ def check_database_url():
     load_dotenv()
     
     db_url = os.getenv("DATABASE_URL", "")
-    if "localhost" in db_url or "user:password" in db_url:
+    if not db_url or db_url == "postgresql://user:password@localhost:5432/soc_db":
         print_error("DATABASE_URL not configured correctly")
-        print_info("Please update DATABASE_URL in .env with your Supabase connection string")
-        print_info("Format: postgresql://postgres:password@db.xxxxx.supabase.co:5432/postgres")
+        print_info("Please update DATABASE_URL in .env with your connection string")
+        print_info("  Local:    postgresql://user:password@localhost:5432/soc_db")
+        print_info("  Supabase: postgresql://postgres:password@db.xxxxx.supabase.co:5432/postgres")
         return False
     
     print_success("DATABASE_URL configured")
