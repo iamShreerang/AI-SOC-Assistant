@@ -9,7 +9,8 @@ import app.services.incident_service as _inc_svc
 
 @pytest.fixture(scope="session")
 def client():
-    return TestClient(app)
+    with TestClient(app) as c:
+        yield c
 
 
 # --- Auth token helpers ---
