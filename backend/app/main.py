@@ -210,26 +210,27 @@ async def startup_event():
     # Check database connection
     logger.info("Checking database connection...")
     if not check_connection():
-        logger.error("Failed to connect to database. Check DATABASE_URL")
-        raise Exception("Database connection failed")
-    
-    logger.info("[OK] Database connected")
-    
-    # Create tables (development only - use Alembic in production)
-    try:
-        create_tables()
-        logger.info("[OK] Tables initialized")
-    except Exception as e:
-        logger.warning(f"Tables may already exist: {e}")
-    
-    # Create default users
-    try:
-        db = SessionLocal()
-        create_default_users(db)
-        db.close()
-        logger.info("[OK] Default users ready")
-    except Exception as e:
-        logger.error(f"User init failed: {e}")
+        logger.warning("[WARNING] Database connection failed. Check DATABASE_URL")
+        logger.warning("[WARNING] API will start but database operations will fail")
+        logger.warning("[WARNING] Please configure PostgreSQL and update DATABASE_URL in .env")
+    else:
+        logger.info("[OK] Database connected")
+        
+        # Create tables (development only - use Alembic in production)
+        try:
+            create_tables()
+            logger.info("[OK] Tables initialized")
+        except Exception as e:
+            logger.warning(f"Tables may already exist: {e}")
+        
+        # Create default users
+        try:
+            db = SessionLocal()
+            create_default_users(db)
+            db.close()
+            logger.info("[OK] Default users ready")
+        except Exception as e:
+            logger.error(f"User init failed: {e}")
     
     # Initialize Elasticsearch
     if settings.elasticsearch_enabled:
