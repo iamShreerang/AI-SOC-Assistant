@@ -66,7 +66,7 @@ export const usePolling = <T,>(
       const timer = setInterval(fetch, settings.refresh_interval || interval);
       return () => clearInterval(timer);
     }
-  }, [fetchFn, interval, settings.auto_refresh, settings.refresh_interval]);
+  }, [interval, settings.auto_refresh, settings.refresh_interval]);
 
   return { data, loading, error };
 };

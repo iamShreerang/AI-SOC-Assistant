@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store';
+import { apiService } from '@/services/api';
 import {
   Login,
   Register,
@@ -27,6 +29,36 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function App() {
+  const { isAuthenticated, setAuth, clearAuth } = useAuthStore();
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  useEffect(() => {
+    const initAuth = async () => {
+      const accessToken = localStorage.getItem('access_token');
+      const refreshToken = localStorage.getItem('refresh_token');
+      
+      if (accessToken && refreshToken && !isAuthenticated) {
+        try {
+          const user = await apiService.getCurrentUser();
+          setAuth(user, { access_token: accessToken, refresh_token: refreshToken });
+        } catch (error) {
+          clearAuth();
+        }
+      }
+      setIsInitializing(false);
+    };
+    
+    initAuth();
+  }, [isAuthenticated, setAuth, clearAuth]);
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-soc-bg-primary">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-soc-accent-cyan"></div>
+      </div>
+    );
+  }
+
   return (
     <Router>
       <Routes>

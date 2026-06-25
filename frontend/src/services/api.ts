@@ -112,8 +112,8 @@ class ApiService {
 
   // Alerts
   async getAlerts(filters?: AlertFilters): Promise<Alert[]> {
-    const response = await this.api.get<Alert[]>('/alerts', { params: filters });
-    return response.data;
+    const response = await this.api.get<{alerts: Alert[]}>('/alerts', { params: filters });
+    return response.data.alerts;
   }
 
   async getAlertById(id: number): Promise<Alert> {
@@ -141,8 +141,8 @@ class ApiService {
 
   // Incidents
   async getIncidents(filters?: IncidentFilters): Promise<Incident[]> {
-    const response = await this.api.get<Incident[]>('/incidents', { params: filters });
-    return response.data;
+    const response = await this.api.get<{incidents: Incident[]}>('/incidents', { params: filters });
+    return response.data.incidents;
   }
 
   async getIncidentById(id: number): Promise<Incident> {
@@ -162,8 +162,8 @@ class ApiService {
 
   // Logs
   async getLogs(filters?: LogFilters): Promise<LogEntry[]> {
-    const response = await this.api.get<LogEntry[]>('/logs', { params: filters });
-    return response.data;
+    const response = await this.api.get<{logs: LogEntry[]}>('/logs', { params: filters });
+    return response.data.logs;
   }
 
   async getLogById(id: number): Promise<LogEntry> {
@@ -196,7 +196,7 @@ class ApiService {
 
   // Search
   async search(query: string): Promise<SearchResults> {
-    const response = await this.api.get<SearchResults>('/search', {
+    const response = await this.api.get<SearchResults>('/search/all', {
       params: { q: query },
     });
     return response.data;

@@ -1,6 +1,6 @@
 """Database connection and session management for Supabase PostgreSQL."""
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import QueuePool
 from typing import Generator
@@ -95,7 +95,7 @@ def check_connection() -> bool:
     """
     try:
         with engine.connect() as conn:
-            conn.execute("SELECT 1")
+            conn.execute(text("SELECT 1"))
         logger.info("Database connection check successful")
         return True
     except Exception as e:
