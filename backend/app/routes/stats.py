@@ -57,3 +57,14 @@ async def get_alert_trends(db: Session = Depends(get_db), _user=Depends(get_curr
 async def get_log_sources(db: Session = Depends(get_db), _user=Depends(get_current_active_user)):
     """Get breakdown of log sources."""
     return db_stats_service.get_log_sources(db)
+
+
+@router.get(
+    "/ml",
+    response_model=Dict,
+    summary="Get ML analytics data",
+    description="Returns machine learning insights and predictions.",
+)
+async def get_ml_analytics(db: Session = Depends(get_db), _user=Depends(get_current_active_user)):
+    """Get ML analytics data."""
+    return db_stats_service.get_ml_analytics(db)
