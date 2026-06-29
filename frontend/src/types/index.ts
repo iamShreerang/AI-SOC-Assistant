@@ -263,3 +263,34 @@ export interface ExportParams {
   severity?: AlertSeverity;
   status?: AlertStatus;
 }
+
+// ML Analytics (from /stats/ml)
+export interface MLPredictionEntry {
+  id: number;
+  alert_id: number;
+  threat: string;
+  confidence: number;
+  severity: AlertSeverity;
+}
+
+export interface MLAnalytics {
+  model_accuracy: number;
+  predictions_today: number;
+  anomalies_detected: number;
+  anomaly_data: ChartDataPoint[];
+  threat_classification: ChartDataPoint[];
+  predictions: MLPredictionEntry[];
+}
+
+// Health Status (from /health)
+export interface HealthStatus {
+  status: string;
+  version: string;
+  components: {
+    database: boolean;
+    elasticsearch: boolean;
+    kafka: boolean;
+    spark: boolean;
+    ml_model: boolean;
+  };
+}

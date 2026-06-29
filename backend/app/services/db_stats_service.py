@@ -112,3 +112,88 @@ def get_log_sources(db: Session) -> List[Dict]:
     ).group_by(Log.source).order_by(func.count(Log.id).desc()).all()
     
     return [{"source": source, "count": count} for source, count in sources_query]
+
+
+def get_ml_analytics(db: Session) -> Dict:
+    """Get ML analytics data derived from real DB records."""
+    # Threat classification derived from alert severity breakdown
+    threat_classification = [
+        {
+            "name": "Critical Threats",
+            "value": db.query(func.count(Alert.id)).filter(Alert.severity == AlertSeverity.CRITICAL).scalar() or 0,
+            "color": "#dc2626",
+        },
+        {
+            "name": "High Risk",
+            "value": db.query(func.count(Alert.id)).filter(Alert.severity == AlertSeverity.HIGH).scalar() or 0,
+            "color": "#ea580c",
+        },
+        {
+            "name": "Medium Risk",
+            "value": db.query(func.count(Alert.id)).filter(Alert.severity == AlertSeverity.MEDIUM).scalar() or 0,
+            "color": "#f59e0b",
+        },
+        {
+            "name": "Low Risk",
+            "value": db.query(func.count(Alert.id)).filter(Alert.severity == AlertSeverity.LOW).scalar() or 0,
+            "color": "#10b981",
+        },
+    ]
+
+    # Anomaly scores: alerts per hour for the past 6 hours
+    anomaly_data = []
+    now = datetime.utcnow()
+    for i in range(5, -1, -1):
+        hour_start = now - timedelta(hours=i + 1)
+        hour_end = now - timedelta(hours=i)
+        label = hour_start.strftime("%H:%M")
+        count = db.query(func.count(Alert.id)).filter(
+            Alert.created_at >= hour_start,
+            Alert.created_at < hour_end,
+        ).scalar() or 0
+        # Normalise to a 0–1 anomaly score
+        anomaly_data.append({"name": label, "value": round(min(count / 10.0, 1.0), 2)})
+
+    # Recent predictions: use the most recent open/acknowledged critical+high alerts as predictions
+    recent_alerts = (
+        db.query(Alert)
+        .filter(Alert.severity.in_([AlertSeverity.CRITICAL, AlertSeverity.HIGH]))
+        .order_by(Alert.created_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    # Derive a threat type and confidence from severity
+    _severity_meta = {
+        AlertSeverity.CRITICAL: ("Anomalous Activity", 0.95),
+        AlertSeverity.HIGH: ("Suspicious Pattern", 0.82),
+        AlertSeverity.MEDIUM: ("Potential Threat", 0.67),
+        AlertSeverity.LOW: ("Low-Level Event", 0.50),
+    }
+
+    predictions = []
+    for alert in recent_alerts:
+        threat, confidence = _severity_meta.get(alert.severity, ("Unknown", 0.5))
+        predictions.append({
+            "id": alert.id,
+            "alert_id": alert.id,
+            "threat": threat,
+            "confidence": confidence,
+            "severity": alert.severity.value,
+        })
+
+    total_alerts = db.query(func.count(Alert.id)).scalar() or 0
+    resolved = db.query(func.count(Alert.id)).filter(Alert.status == AlertStatus.RESOLVED).scalar() or 0
+    accuracy = round((resolved / total_alerts * 100), 1) if total_alerts > 0 else 0.0
+
+    return {
+        "model_accuracy": accuracy,
+        "predictions_today": total_alerts,
+        "anomalies_detected": db.query(func.count(Alert.id)).filter(
+            Alert.severity == AlertSeverity.CRITICAL,
+            Alert.status != AlertStatus.RESOLVED,
+        ).scalar() or 0,
+        "anomaly_data": anomaly_data,
+        "threat_classification": threat_classification,
+        "predictions": predictions,
+    }

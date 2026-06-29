@@ -2,13 +2,14 @@ import { Activity, AlertTriangle, FileText, Shield } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { SystemHealth } from '@/components/dashboard/SystemHealth';
-import { DonutChart, LineChartComponent, BarChartComponent } from '@/components/charts';
+import { DonutChart, BarChartComponent } from '@/components/charts';
 import { useFetch } from '@/hooks';
 import { apiService } from '@/services/api';
 import { Spinner } from '@/components/ui/Spinner';
 
 export const Dashboard = () => {
   const { data: summary, loading } = useFetch(() => apiService.getDashboardSummary());
+  const { data: health } = useFetch(() => apiService.checkHealth());
 
   if (loading) {
     return (
@@ -46,12 +47,12 @@ export const Dashboard = () => {
       ]
     : [];
 
-  const healthData = {
-    database: true,
-    elasticsearch: true,
-    kafka: true,
-    spark: true,
-    ml_model: true,
+  const healthData = health?.components ?? {
+    database: false,
+    elasticsearch: false,
+    kafka: false,
+    spark: false,
+    ml_model: false,
   };
 
   return (
