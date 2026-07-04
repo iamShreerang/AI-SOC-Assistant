@@ -11,6 +11,9 @@ from app.schemas.enums import LogSeverity, AlertSeverity, AlertStatus, IncidentS
 
 Base = declarative_base()
 
+# Helper: tell SQLAlchemy to use enum .value (lowercase) not .name (uppercase)
+_use_values = lambda x: [e.value for e in x]
+
 
 class User(Base):
     """User model for authentication and authorization."""
@@ -19,7 +22,7 @@ class User(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     username = Column(String(100), unique=True, nullable=False, index=True)
     hashed_password = Column(String(255), nullable=False)
-    role = Column(SQLEnum(UserRole, name="user_role"), nullable=False, default=UserRole.ANALYST)
+    role = Column(SQLEnum(UserRole, name="user_role", values_callable=_use_values), nullable=False, default=UserRole.ANALYST)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -35,7 +38,7 @@ class Log(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     source = Column(String(255), nullable=False, index=True)
-    severity = Column(SQLEnum(LogSeverity, name="log_severity"), nullable=False, index=True)
+    severity = Column(SQLEnum(LogSeverity, name="log_severity", values_callable=_use_values), nullable=False, index=True)
     message = Column(Text, nullable=False)
     timestamp = Column(DateTime, nullable=True)
     raw = Column(Text, nullable=True)
@@ -48,10 +51,10 @@ class Alert(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     title = Column(String(255), nullable=False)
-    severity = Column(SQLEnum(AlertSeverity, name="alert_severity"), nullable=False, index=True)
+    severity = Column(SQLEnum(AlertSeverity, name="alert_severity", values_callable=_use_values), nullable=False, index=True)
     source = Column(String(255), nullable=False, index=True)
     description = Column(Text, nullable=True)
-    status = Column(SQLEnum(AlertStatus, name="alert_status"), nullable=False, default=AlertStatus.OPEN, index=True)
+    status = Column(SQLEnum(AlertStatus, name="alert_status", values_callable=_use_values), nullable=False, default=AlertStatus.OPEN, index=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -67,7 +70,7 @@ class Incident(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    status = Column(SQLEnum(IncidentStatus, name="incident_status"), nullable=False, default=IncidentStatus.OPEN, index=True)
+    status = Column(SQLEnum(IncidentStatus, name="incident_status", values_callable=_use_values), nullable=False, default=IncidentStatus.OPEN, index=True)
     summary = Column(Text, nullable=True)
     assigned_to = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)

@@ -19,6 +19,8 @@ import type {
   RecentActivity,
   AlertTrends,
   SearchResults,
+  MLAnalytics,
+  HealthStatus,
 } from '@/types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
@@ -112,8 +114,8 @@ class ApiService {
 
   // Alerts
   async getAlerts(filters?: AlertFilters): Promise<Alert[]> {
-    const response = await this.api.get<Alert[]>('/alerts', { params: filters });
-    return response.data;
+    const response = await this.api.get<{alerts: Alert[]}>('/alerts', { params: filters });
+    return response.data.alerts;
   }
 
   async getAlertById(id: number): Promise<Alert> {
@@ -141,8 +143,8 @@ class ApiService {
 
   // Incidents
   async getIncidents(filters?: IncidentFilters): Promise<Incident[]> {
-    const response = await this.api.get<Incident[]>('/incidents', { params: filters });
-    return response.data;
+    const response = await this.api.get<{incidents: Incident[]}>('/incidents', { params: filters });
+    return response.data.incidents;
   }
 
   async getIncidentById(id: number): Promise<Incident> {
@@ -162,8 +164,8 @@ class ApiService {
 
   // Logs
   async getLogs(filters?: LogFilters): Promise<LogEntry[]> {
-    const response = await this.api.get<LogEntry[]>('/logs', { params: filters });
-    return response.data;
+    const response = await this.api.get<{logs: LogEntry[]}>('/logs', { params: filters });
+    return response.data.logs;
   }
 
   async getLogById(id: number): Promise<LogEntry> {
@@ -194,9 +196,14 @@ class ApiService {
     return response.data;
   }
 
+  async getMLAnalytics(): Promise<MLAnalytics> {
+    const response = await this.api.get<MLAnalytics>('/stats/ml');
+    return response.data;
+  }
+
   // Search
   async search(query: string): Promise<SearchResults> {
-    const response = await this.api.get<SearchResults>('/search', {
+    const response = await this.api.get<SearchResults>('/search/all', {
       params: { q: query },
     });
     return response.data;
@@ -228,8 +235,8 @@ class ApiService {
   }
 
   // Health Check
-  async checkHealth(): Promise<{ status: string }> {
-    const response = await this.api.get<{ status: string }>('/health');
+  async checkHealth(): Promise<HealthStatus> {
+    const response = await this.api.get<HealthStatus>('/health');
     return response.data;
   }
 }

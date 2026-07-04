@@ -22,6 +22,10 @@ export const Login = () => {
 
     try {
       const tokens = await apiService.login({ username, password });
+      // Store tokens temporarily so apiService.getCurrentUser() can use them
+      localStorage.setItem('access_token', tokens.access_token);
+      localStorage.setItem('refresh_token', tokens.refresh_token);
+      
       const user = await apiService.getCurrentUser();
       setAuth(user, tokens);
       navigate('/dashboard');
