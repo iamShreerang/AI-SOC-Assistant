@@ -9,7 +9,8 @@ import app.services.incident_service as _inc_svc
 
 @pytest.fixture(scope="session")
 def client():
-    return TestClient(app)
+    with TestClient(app) as c:
+        yield c
 
 
 # --- Auth token helpers ---
@@ -40,9 +41,23 @@ def admin_headers(admin_token):
 
 # --- Store reset between tests that need isolation ---
 
-@pytest.fixture(autouse=False)
+@pytest.fixture(autouse=True)
 def reset_stores():
-    """Reset all in-memory stores before a test that needs a clean slate."""
+    """Reset all database tables and in-memory stores before every test."""
+    from app.database import SessionLocal
+    from app.models.database import Log, Alert, Incident
+    
+    db = SessionLocal()
+    try:
+        db.query(Incident).delete()
+        db.query(Alert).delete()
+        db.query(Log).delete()
+        db.commit()
+    except Exception:
+        db.rollback()
+    finally:
+        db.close()
+
     _log_svc._store.clear()
     _log_svc._counter = 0
     _alert_svc._store.clear()

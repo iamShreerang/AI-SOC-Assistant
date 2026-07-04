@@ -1,6 +1,5 @@
 """Test log generator output without Kafka."""
 import json, sys, types
-
 # Mock kafka so log_generator imports without Kafka installed
 kafka_mock = types.ModuleType("kafka")
 kafka_mock.KafkaProducer = None
@@ -8,7 +7,6 @@ errors_mock = types.ModuleType("kafka.errors")
 errors_mock.NoBrokersAvailable = Exception
 sys.modules["kafka"] = kafka_mock
 sys.modules["kafka.errors"] = errors_mock
-
 from log_generator import (
     cic_brute_force, cic_ddos, cic_bot, cic_sql_injection, cic_infiltration,
     unsw_recon, unsw_shellcode, unsw_exploits, unsw_worm, unsw_brute_force,
@@ -16,10 +14,8 @@ from log_generator import (
     syslog_brute_force, syslog_sql_injection, syslog_port_scan,
     syslog_ransomware, syslog_c2, syslog_privilege_escalation, syslog_data_exfiltration,
 )
-
 attacker = "45.23.11.98"
 target   = "10.0.0.14"
-
 TESTS = {
     "CIC-IDS2018 / CIC-APT-IDS2023": [
         ("brute_force",   cic_brute_force),
@@ -50,7 +46,6 @@ TESTS = {
         ("data_exfiltration",    syslog_data_exfiltration),
     ],
 }
-
 for dataset, scenarios in TESTS.items():
     print(f"\n{'='*65}")
     print(f"  DATASET: {dataset}")
@@ -71,5 +66,4 @@ for dataset, scenarios in TESTS.items():
             print(f"    label    : {label}")
         else:
             print(f"    raw      : {raw[:100]}")
-
 print("\n\nAll scenarios generated successfully.")

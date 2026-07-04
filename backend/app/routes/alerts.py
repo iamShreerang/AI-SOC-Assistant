@@ -81,13 +81,13 @@ async def update_alert(
     return alert
 
 
-@router.patch("/bulk/status", response_model=list[AlertResponse])
+@router.post("/bulk", response_model=list[AlertResponse])
 async def bulk_update_alerts(
     payload: BulkAlertUpdate,
     db: Session = Depends(get_db),
     _user=Depends(require_role("admin")),
 ):
-    """Bulk update alert statuses (admin only)."""
+    """Bulk update alert statuses (admin only). POST /alerts/bulk"""
     updated = db_alert_service.bulk_update_alert_status(db, payload.alert_ids, payload.status)
     if not updated:
         raise HTTPException(status_code=404, detail="No alerts found with provided IDs")

@@ -62,7 +62,7 @@ async def create_incident(
     
     # Auto-generate AI summary (non-blocking - failure won't block incident creation)
     try:
-        summary = llm_service.generate_incident_summary(incident.model_dump())
+        summary = llm_service.generate_incident_summary(incident.model_dump(mode="json"))
         if summary:
             incident = db_incident_service.attach_summary(db, incident.id, summary)
             logger.info(f"Auto-generated summary for incident {incident.id}")

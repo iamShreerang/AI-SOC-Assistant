@@ -2,10 +2,13 @@
 
 from fastapi import APIRouter, Depends, Query
 from typing import List, Dict
+from sqlalchemy.orm import Session
+
 from app.schemas.log import LogResponse
 from app.schemas.alert import AlertResponse
 from app.schemas.incident import IncidentResponse
 from app.services import search_service
+from app.database import get_db
 from app.utils.security import get_current_active_user
 
 router = APIRouter()
@@ -20,10 +23,11 @@ router = APIRouter()
 async def search_logs(
     q: str = Query(..., description="Search query", min_length=1),
     limit: int = Query(50, description="Maximum results to return"),
+    db: Session = Depends(get_db),
     _user=Depends(get_current_active_user),
 ):
     """Search logs by query string."""
-    return search_service.search_logs(q, limit=limit)
+    return search_service.search_logs(q, limit=limit, db=db)
 
 
 @router.get(
@@ -35,10 +39,11 @@ async def search_logs(
 async def search_alerts(
     q: str = Query(..., description="Search query", min_length=1),
     limit: int = Query(50, description="Maximum results to return"),
+    db: Session = Depends(get_db),
     _user=Depends(get_current_active_user),
 ):
     """Search alerts by query string."""
-    return search_service.search_alerts(q, limit=limit)
+    return search_service.search_alerts(q, limit=limit, db=db)
 
 
 @router.get(
@@ -50,10 +55,11 @@ async def search_alerts(
 async def search_incidents(
     q: str = Query(..., description="Search query", min_length=1),
     limit: int = Query(50, description="Maximum results to return"),
+    db: Session = Depends(get_db),
     _user=Depends(get_current_active_user),
 ):
     """Search incidents by query string."""
-    return search_service.search_incidents(q, limit=limit)
+    return search_service.search_incidents(q, limit=limit, db=db)
 
 
 @router.get(
@@ -64,7 +70,8 @@ async def search_incidents(
 )
 async def global_search(
     q: str = Query(..., description="Search query", min_length=1),
+    db: Session = Depends(get_db),
     _user=Depends(get_current_active_user),
 ):
     """Search across all entities."""
-    return search_service.global_search(q)
+    return search_service.global_search(q, db=db)
