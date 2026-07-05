@@ -54,10 +54,11 @@ def test_tables():
     ]
     
     try:
+        from sqlalchemy import text
         with engine.connect() as conn:
             result = conn.execute(
-                "SELECT table_name FROM information_schema.tables "
-                "WHERE table_schema = 'public' ORDER BY table_name"
+                text("SELECT table_name FROM information_schema.tables "
+                "WHERE table_schema = 'public' ORDER BY table_name")
             )
             existing_tables = [row[0] for row in result]
         

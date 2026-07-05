@@ -168,7 +168,11 @@ async def auth_google_callback(request: Request, db: Session = Depends(get_db)):
     if not user_info or not user_info.get("email"):
         raise HTTPException(status_code=400, detail="Could not fetch user info from Google")
     user = db_auth_service.get_or_create_oauth_user(db, user_info["email"], "google")
-    return db_auth_service.generate_token(user)
+    token_data = db_auth_service.generate_token(user)
+    
+    # Redirect to frontend with tokens as query parameters
+    redirect_url = f"{settings.frontend_url}/auth/callback?access_token={token_data.access_token}&refresh_token={token_data.refresh_token}"
+    return RedirectResponse(url=redirect_url)
 
 
 @router.get("/login/github", summary="Redirect to GitHub OAuth")
@@ -186,7 +190,11 @@ async def auth_github_callback(request: Request, db: Session = Depends(get_db)):
     if not primary_email:
         raise HTTPException(status_code=400, detail="Could not fetch email from GitHub")
     user = db_auth_service.get_or_create_oauth_user(db, primary_email, "github")
-    return db_auth_service.generate_token(user)
+    token_data = db_auth_service.generate_token(user)
+    
+    # Redirect to frontend with tokens as query parameters
+    redirect_url = f"{settings.frontend_url}/auth/callback?access_token={token_data.access_token}&refresh_token={token_data.refresh_token}"
+    return RedirectResponse(url=redirect_url)
 
 
 # ── Admin User Management Routes ──────────────────────────────────────────────
