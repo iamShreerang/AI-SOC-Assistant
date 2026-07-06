@@ -1,6 +1,7 @@
 """Incident service with PostgreSQL backend."""
 
 from datetime import datetime
+import logging
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -8,6 +9,10 @@ from sqlalchemy import func
 from app.schemas.incident import IncidentCreate, IncidentResponse
 from app.schemas.enums import IncidentStatus
 from app.models.database import Incident, IncidentAlert, Alert
+from app.utils.config import settings
+from app.utils.elasticsearch_client import get_es_client
+
+logger = logging.getLogger(__name__)
 
 
 def create_incident(db: Session, payload: IncidentCreate) -> IncidentResponse:
@@ -36,6 +41,24 @@ def create_incident(db: Session, payload: IncidentCreate) -> IncidentResponse:
     db.commit()
     db.refresh(db_incident)
     
+    # Elasticsearch dual-write
+    if settings.elasticsearch_enabled:
+        try:
+            client = get_es_client()
+            if client:
+                doc = {
+                    "id": db_incident.id,
+                    "title": db_incident.title,
+                    "status": db_incident.status.value if hasattr(db_incident.status, 'value') else db_incident.status,
+                    "description": db_incident.description,
+                    "alert_ids": payload.alert_ids,
+                    "summary": db_incident.summary,
+                    "created_at": db_incident.created_at.isoformat() if db_incident.created_at else None,
+                }
+                client.index(index="soc-incidents", id=db_incident.id, document=doc)
+        except Exception as e:
+            logger.warning(f"Failed to index incident in Elasticsearch: {e}")
+            
     return IncidentResponse(
         id=db_incident.id,
         title=db_incident.title,
@@ -111,6 +134,19 @@ def attach_summary(db: Session, incident_id: int, summary: str) -> Optional[Inci
     db.commit()
     db.refresh(incident)
     
+    # Elasticsearch dual-write
+    if settings.elasticsearch_enabled:
+        try:
+            client = get_es_client()
+            if client:
+                client.update(
+                    index="soc-incidents",
+                    id=incident_id,
+                    doc={"summary": summary}
+                )
+        except Exception as e:
+            logger.warning(f"Failed to update incident summary in Elasticsearch: {e}")
+            
     # Get associated alert IDs
     alert_ids = [
         ia.alert_id 
@@ -148,6 +184,19 @@ def update_incident_status(
     db.commit()
     db.refresh(incident)
     
+    # Elasticsearch dual-write
+    if settings.elasticsearch_enabled:
+        try:
+            client = get_es_client()
+            if client:
+                client.update(
+                    index="soc-incidents",
+                    id=incident_id,
+                    doc={"status": status.value if hasattr(status, 'value') else status}
+                )
+        except Exception as e:
+            logger.warning(f"Failed to update incident status in Elasticsearch: {e}")
+            
     # Get associated alert IDs
     alert_ids = [
         ia.alert_id 

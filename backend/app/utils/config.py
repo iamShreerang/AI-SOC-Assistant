@@ -40,7 +40,10 @@ class Settings(BaseSettings):
     oauth_redirect_uri: str = "http://localhost:8000/auth/callback"
 
     # CORS
-    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:5173", "http://localhost:8080"]
+    cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3001", "http://localhost:5173", "http://localhost:8080"]
+    
+    # Frontend URL for OAuth redirects
+    frontend_url: str = "http://localhost:3001"
 
     class Config:
         env_file = ".env"

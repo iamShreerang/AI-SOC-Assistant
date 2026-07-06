@@ -45,13 +45,14 @@ def admin_headers(admin_token):
 def reset_stores():
     """Reset all database tables and in-memory stores before every test."""
     from app.database import SessionLocal
-    from app.models.database import Log, Alert, Incident
+    from app.models.database import Log, Alert, Incident, User
     
     db = SessionLocal()
     try:
         db.query(Incident).delete()
         db.query(Alert).delete()
         db.query(Log).delete()
+        db.query(User).filter(User.username.notin_(["analyst", "admin"])).delete(synchronize_session=False)
         db.commit()
     except Exception:
         db.rollback()

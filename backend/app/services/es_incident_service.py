@@ -185,13 +185,11 @@ def get_incidents_count(status: Optional[IncidentStatus] = None) -> int:
         return memory_service.get_incidents_count(status=status)
 
 
-def search_incidents(query: str, limit: int = 50) -> List[IncidentResponse]:
-    """Search incidents using Elasticsearch."""
+def search_incidents_direct(query: str, limit: int = 50) -> Optional[List[IncidentResponse]]:
+    """Search incidents using Elasticsearch directly without recursive fallback."""
     client = get_es_client()
-    
     if not client:
-        from app.services import search_service
-        return search_service.search_incidents(query, limit)
+        return None
     
     try:
         search_query = {
@@ -219,12 +217,29 @@ def search_incidents(query: str, limit: int = 50) -> List[IncidentResponse]:
                 description=source_data.get("description"),
                 alert_ids=source_data.get("alert_ids", []),
                 summary=source_data.get("summary"),
-                created_at=datetime.fromisoformat(source_data["created_at"]),
+                created_at=datetime.utcnow(),  # Fallback to current utc time if parsing fails
             ))
+            # Safely parse date
+            try:
+                incidents[-1].created_at = datetime.fromisoformat(source_data["created_at"])
+            except Exception:
+                pass
         
         return incidents
-    
     except Exception as e:
         print(f"Elasticsearch search failed: {e}")
-        from app.services import search_service
-        return search_service.search_incidents(query, limit)
+        return None
+
+
+def search_incidents(query: str, limit: int = 50) -> List[IncidentResponse]:
+    """Search incidents using Elasticsearch with fallback to memory."""
+    res = search_incidents_direct(query, limit)
+    if res is not None:
+        return res
+    # Fallback to simple in-memory search
+    incidents = memory_service.get_incidents(limit=1000)
+    matching = [
+        inc for inc in incidents
+        if query.lower() in inc.title.lower() or (inc.description and query.lower() in inc.description.lower()) or (inc.summary and query.lower() in inc.summary.lower())
+    ]
+    return matching[:limit]
