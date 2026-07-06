@@ -1,6 +1,7 @@
 """Log service with PostgreSQL backend."""
 
 from datetime import datetime
+import logging
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -8,6 +9,10 @@ from sqlalchemy import func
 from app.schemas.log import LogCreate, LogResponse
 from app.schemas.enums import LogSeverity
 from app.models.database import Log
+from app.utils.config import settings
+from app.utils.elasticsearch_client import get_es_client
+
+logger = logging.getLogger(__name__)
 
 
 def create_log(db: Session, payload: LogCreate) -> LogResponse:
@@ -24,6 +29,24 @@ def create_log(db: Session, payload: LogCreate) -> LogResponse:
     db.commit()
     db.refresh(db_log)
     
+    # Elasticsearch dual-write
+    if settings.elasticsearch_enabled:
+        try:
+            client = get_es_client()
+            if client:
+                doc = {
+                    "id": db_log.id,
+                    "source": db_log.source,
+                    "severity": db_log.severity.value if hasattr(db_log.severity, 'value') else db_log.severity,
+                    "message": db_log.message,
+                    "timestamp": db_log.timestamp.isoformat() if db_log.timestamp else None,
+                    "raw": db_log.raw,
+                    "ingested_at": db_log.ingested_at.isoformat() if db_log.ingested_at else None,
+                }
+                client.index(index="soc-logs", id=db_log.id, document=doc)
+        except Exception as e:
+            logger.warning(f"Failed to index log in Elasticsearch: {e}")
+            
     return LogResponse(
         id=db_log.id,
         source=db_log.source,

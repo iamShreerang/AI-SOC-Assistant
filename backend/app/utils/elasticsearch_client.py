@@ -18,7 +18,8 @@ def get_es_client() -> Optional[Elasticsearch]:
         try:
             _client = Elasticsearch(
                 [settings.elasticsearch_url],
-                verify_certs=False,  # For local development
+                verify_certs=False,       # No TLS in local dev
+                ssl_show_warn=False,      # Suppress SSL warnings
                 request_timeout=30,
             )
             

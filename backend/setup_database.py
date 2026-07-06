@@ -20,13 +20,13 @@ def print_header(text):
     print(f"{'='*60}\n")
 
 def print_success(text):
-    print(f"✓ {text}")
+    print(f"[OK] {text}")
 
 def print_error(text):
-    print(f"✗ {text}")
+    print(f"[ERROR] {text}")
 
 def print_info(text):
-    print(f"ℹ {text}")
+    print(f"[INFO] {text}")
 
 def check_python_version():
     """Ensure Python 3.11+ is being used."""

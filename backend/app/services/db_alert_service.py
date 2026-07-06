@@ -1,6 +1,7 @@
 """Alert service with PostgreSQL backend."""
 
 from datetime import datetime
+import logging
 from typing import Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import func
@@ -8,6 +9,10 @@ from sqlalchemy import func
 from app.schemas.alert import AlertCreate, AlertResponse, AlertUpdate
 from app.schemas.enums import AlertSeverity, AlertStatus
 from app.models.database import Alert
+from app.utils.config import settings
+from app.utils.elasticsearch_client import get_es_client
+
+logger = logging.getLogger(__name__)
 
 
 def create_alert(db: Session, payload: AlertCreate) -> AlertResponse:
@@ -24,6 +29,24 @@ def create_alert(db: Session, payload: AlertCreate) -> AlertResponse:
     db.commit()
     db.refresh(db_alert)
     
+    # Elasticsearch dual-write
+    if settings.elasticsearch_enabled:
+        try:
+            client = get_es_client()
+            if client:
+                doc = {
+                    "id": db_alert.id,
+                    "title": db_alert.title,
+                    "severity": db_alert.severity.value if hasattr(db_alert.severity, 'value') else db_alert.severity,
+                    "status": db_alert.status.value if hasattr(db_alert.status, 'value') else db_alert.status,
+                    "source": db_alert.source,
+                    "description": db_alert.description,
+                    "created_at": db_alert.created_at.isoformat() if db_alert.created_at else None,
+                }
+                client.index(index="soc-alerts", id=db_alert.id, document=doc)
+        except Exception as e:
+            logger.warning(f"Failed to index alert in Elasticsearch: {e}")
+            
     return AlertResponse(
         id=db_alert.id,
         title=db_alert.title,
@@ -103,6 +126,19 @@ def update_alert_status(
     db.commit()
     db.refresh(alert)
     
+    # Elasticsearch dual-write
+    if settings.elasticsearch_enabled:
+        try:
+            client = get_es_client()
+            if client:
+                client.update(
+                    index="soc-alerts",
+                    id=alert_id,
+                    doc={"status": payload.status.value if hasattr(payload.status, 'value') else payload.status}
+                )
+        except Exception as e:
+            logger.warning(f"Failed to update alert in Elasticsearch: {e}")
+            
     return AlertResponse(
         id=alert.id,
         title=alert.title,
@@ -137,6 +173,21 @@ def bulk_update_alert_status(
         ))
     
     db.commit()
+    
+    # Elasticsearch dual-write
+    if settings.elasticsearch_enabled:
+        try:
+            client = get_es_client()
+            if client:
+                for alert in alerts:
+                    client.update(
+                        index="soc-alerts",
+                        id=alert.id,
+                        doc={"status": status.value if hasattr(status, 'value') else status}
+                    )
+        except Exception as e:
+            logger.warning(f"Failed to bulk update alerts in Elasticsearch: {e}")
+            
     return updated
 
 

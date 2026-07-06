@@ -158,14 +158,11 @@ def get_logs_count(
         return memory_service.get_logs_count(severity=severity, source=source)
 
 
-def search_logs(query: str, limit: int = 50) -> List[LogResponse]:
-    """Search logs using Elasticsearch full-text search."""
+def search_logs_direct(query: str, limit: int = 50) -> Optional[List[LogResponse]]:
+    """Search logs using Elasticsearch full-text search directly without recursive fallback."""
     client = get_es_client()
-    
     if not client:
-        # Fallback to simple in-memory search
-        from app.services import search_service
-        return search_service.search_logs(query, limit)
+        return None
     
     try:
         search_query = {
@@ -197,8 +194,20 @@ def search_logs(query: str, limit: int = 50) -> List[LogResponse]:
             ))
         
         return logs
-    
     except Exception as e:
         print(f"Elasticsearch search failed: {e}")
-        from app.services import search_service
-        return search_service.search_logs(query, limit)
+        return None
+
+
+def search_logs(query: str, limit: int = 50) -> List[LogResponse]:
+    """Search logs using Elasticsearch with fallback to memory."""
+    res = search_logs_direct(query, limit)
+    if res is not None:
+        return res
+    # Fallback to simple in-memory search
+    logs = memory_service.get_logs(limit=1000)
+    matching = [
+        log for log in logs
+        if query.lower() in log.message.lower() or query.lower() in log.source.lower()
+    ]
+    return matching[:limit]

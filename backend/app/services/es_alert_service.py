@@ -176,13 +176,11 @@ def get_alerts_count(
         return memory_service.get_alerts_count(severity=severity, status=status, source=source)
 
 
-def search_alerts(query: str, limit: int = 50) -> List[AlertResponse]:
-    """Search alerts using Elasticsearch."""
+def search_alerts_direct(query: str, limit: int = 50) -> Optional[List[AlertResponse]]:
+    """Search alerts using Elasticsearch directly without recursive fallback."""
     client = get_es_client()
-    
     if not client:
-        from app.services import search_service
-        return search_service.search_alerts(query, limit)
+        return None
     
     try:
         search_query = {
@@ -214,8 +212,20 @@ def search_alerts(query: str, limit: int = 50) -> List[AlertResponse]:
             ))
         
         return alerts
-    
     except Exception as e:
         print(f"Elasticsearch search failed: {e}")
-        from app.services import search_service
-        return search_service.search_alerts(query, limit)
+        return None
+
+
+def search_alerts(query: str, limit: int = 50) -> List[AlertResponse]:
+    """Search alerts using Elasticsearch with fallback to memory."""
+    res = search_alerts_direct(query, limit)
+    if res is not None:
+        return res
+    # Fallback to simple in-memory search
+    alerts = memory_service.get_alerts(limit=1000)
+    matching = [
+        alert for alert in alerts
+        if query.lower() in alert.title.lower() or (alert.description and query.lower() in alert.description.lower())
+    ]
+    return matching[:limit]

@@ -6,6 +6,7 @@ import {
   Login,
   Register,
   ForgotPassword,
+  AuthCallback,
   Dashboard,
   Monitoring,
   Alerts,
@@ -85,6 +86,14 @@ function App() {
           element={
             <PublicRoute>
               <ForgotPassword />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/auth/callback"
+          element={
+            <PublicRoute>
+              <AuthCallback />
             </PublicRoute>
           }
         />

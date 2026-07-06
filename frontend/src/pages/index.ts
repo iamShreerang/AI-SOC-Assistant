@@ -1,6 +1,7 @@
 export { Login } from './auth/Login';
 export { Register } from './auth/Register';
 export { ForgotPassword } from './auth/ForgotPassword';
+export { AuthCallback } from './auth/AuthCallback';
 export { Dashboard } from './Dashboard';
 export { Monitoring } from './Monitoring';
 export { Alerts } from './Alerts';
