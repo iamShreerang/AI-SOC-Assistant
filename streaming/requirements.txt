@@ -1,0 +1,10 @@
+# Streaming pipeline dependencies
+pyspark==3.5.1
+kafka-python==2.0.2
+python-dotenv==1.0.1
+
+# ML (must match ml/requirements.txt)
+scikit-learn==1.4.2
+pandas==2.2.1
+numpy==1.26.4
+torch==2.2.2
