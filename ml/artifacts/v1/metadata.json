@@ -1,0 +1,75 @@
+{
+  "model_version": "v1",
+  "trained_at": "2026-07-06T12:51:48.810711",
+  "sequence_length": 10,
+  "n_features": 141,
+  "classes": [
+    "0",
+    "1"
+  ],
+  "datasets_used": [
+    "beth",
+    "cic_ids2018",
+    "dsrl_api2023",
+    "unsw_nb15"
+  ],
+  "dataset_summary": {
+    "beth": {
+      "rows": 100000,
+      "columns": 9,
+      "loaded": true,
+      "error": null,
+      "label_distribution": {
+        "0": 88025,
+        "1": 11975
+      }
+    },
+    "cic_ids2018": {
+      "rows": 150000,
+      "columns": 78,
+      "loaded": true,
+      "error": null,
+      "label_distribution": {
+        "0": 128185,
+        "1": 21815
+      }
+    },
+    "dsrl_api2023": {
+      "rows": 65000,
+      "columns": 78,
+      "loaded": true,
+      "error": null,
+      "label_distribution": {
+        "1": 55000,
+        "0": 10000
+      }
+    },
+    "unsw_nb15": {
+      "rows": 257673,
+      "columns": 40,
+      "loaded": true,
+      "error": null,
+      "label_distribution": {
+        "1": 164673,
+        "0": 93000
+      }
+    }
+  },
+  "hyperparameters": {
+    "epochs": 50,
+    "batch_size": 64,
+    "learning_rate": 0.001,
+    "patience": 10
+  },
+  "eval_metrics": {
+    "accuracy": 0.9454534341546897,
+    "precision": 0.9541190656230202,
+    "recall": 0.9210464015151515,
+    "f1_score": 0.937291079011032,
+    "prediction_latency_ms": 0.0099,
+    "total_samples": 114526,
+    "roc_auc": 0.9901868771558181
+  },
+  "saved_at": "2026-07-06T12:51:48.810736",
+  "version": "v1"
+}
