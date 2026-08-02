@@ -53,8 +53,8 @@ They accept JSON only and must **not** be exposed to the public internet.
 | Caller | Endpoint | Purpose |
 |---|---|---|
 | **Kafka consumer** (Ayush) | `POST /ingest/logs` | Forward a parsed log from a Kafka topic into the backend store |
-| **ML anomaly detector** (Sayog) | `POST /ingest/alerts` | Push a detected anomaly as an alert into the backend store |
-| **LLM summariser** (Sayog) | `POST /summaries` | Attach an AI-generated narrative summary to an existing incident |
+| **ML anomaly detector** (Shreerang) | `POST /ingest/alerts` | Push a detected anomaly as an alert into the backend store |
+| **LLM summariser** (Shreerang) | `POST /summaries` | Attach an AI-generated narrative summary to an existing incident |
 
 ---
 

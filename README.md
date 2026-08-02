@@ -54,11 +54,10 @@ React Dashboard (frontend/)
 
 | Name | GitHub | Role |
 |---|---|---|
-| Shreerang Kolhe | [@iamShreerang](https://github.com/iamShreerang) | Backend + Integration |
-| Sayog Shendre | [@Sayog-Shendre](https://github.com/Sayog-Shendre) | AI / ML |
+| Shreerang Kolhe | [@iamShreerang](https://github.com/iamShreerang) | Backend + Integration + Frontend + Database |
 | Ayush Dandge | [@AyushDandge](https://github.com/AyushDandge) | Big Data Pipeline |
-| Aryan Dandge | [@aryansdandge-7](https://github.com/aryansdandge-7) | Frontend |
-| Sumiran Bagul | [@sumiran-7](https://github.com/sumiran-7) | Database |
+| Aryan Dandge | [@aryansdandge-7](https://github.com/aryansdandge-7) | ML |
+| Sumiran Bagul | [@sumiran-7](https://github.com/sumiran-7) | ML |
 
 ---
 

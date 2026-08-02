@@ -9,9 +9,9 @@
 | `main` | Stable, reviewed code only | Merged via PR |
 | `backend` | FastAPI development | Shreerang |
 | `big-data` | Kafka + Spark pipeline | Ayush Dandge |
-| `ai-ml` | ML models | Sayog Shendre |
-| `frontend` | React dashboard | Aryan Dandge |
-| `database` | Schema and migrations | Sumiran Bagul |
+| `ai-ml` | ML models | Sumiran Bagul, Aryan Dandge |
+| `frontend` | React dashboard | Shreerang |
+| `database` | Schema and migrations | Shreerang |
 
 ### Feature Branch Naming
 
