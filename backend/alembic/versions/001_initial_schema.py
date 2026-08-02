@@ -17,13 +17,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create enum types
-    op.execute("CREATE TYPE user_role AS ENUM ('analyst', 'admin')")
-    op.execute("CREATE TYPE log_severity AS ENUM ('info', 'warning', 'error', 'critical')")
-    op.execute("CREATE TYPE alert_severity AS ENUM ('low', 'medium', 'high', 'critical')")
-    op.execute("CREATE TYPE alert_status AS ENUM ('open', 'acknowledged', 'resolved')")
-    op.execute("CREATE TYPE incident_status AS ENUM ('open', 'in-progress', 'closed')")
-    
+ 
     # Create users table
     op.create_table(
         'users',
