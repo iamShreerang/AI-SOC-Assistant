@@ -193,10 +193,13 @@ docker compose up -d zookeeper kafka kafka-init kafka-ui
 
 ### Step 4 — Spark Streaming Consumer
 
-> **Requires:** Java 11+, PySpark (`pip install pyspark`)
+> **Requires:** Java 11 or 17, PySpark (`pip install pyspark==3.5.1`)
 
-```bash
-# From repo root
+```powershell
+# Windows PowerShell launcher (auto-configures project JDK 17 & Hadoop winutils):
+.\scripts\start_spark.ps1
+
+# Or run directly via Python:
 python streaming/spark/streaming_job.py
 ```
 
@@ -229,7 +232,10 @@ python streaming/kafka/producer.py --broker localhost:9092 --topic unsw-logs --d
 Run the complete ML pipeline using local JSONL files — no Kafka, no Docker, no Java cluster needed:
 
 ```bash
-# From repo root
+# Pure Python local pipeline simulator:
+python streaming/run_local_pipeline.py
+
+# Or Spark local test mode:
 python streaming/spark/streaming_job.py --local-test
 ```
 
@@ -303,11 +309,11 @@ python -m pytest streaming/tests/ -v
   "version": "0.1.0",
   "components": {
     "database": true,
-    "kafka": false,
-    "spark": false,
+    "kafka": true,
+    "spark": true,
     "ml_model": true,
     "llm": true,
-    "elasticsearch": { "enabled": false, "healthy": false }
+    "elasticsearch": { "enabled": true, "healthy": true }
   }
 }
 ```
