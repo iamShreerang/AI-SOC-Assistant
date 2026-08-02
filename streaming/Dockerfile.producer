@@ -1,0 +1,14 @@
+# Kafka producer container — reads streaming/sample_logs/*.jsonl and
+# publishes them to Kafka. Lightweight image: no PySpark/PyTorch needed here.
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir "kafka-python>=2.2.15" python-dotenv==1.0.1
+
+COPY streaming/ streaming/
+
+ENV PYTHONUNBUFFERED=1
+
+ENTRYPOINT ["python", "streaming/kafka/producer.py"]
+CMD ["--continuous"]

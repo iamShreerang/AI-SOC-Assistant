@@ -106,6 +106,16 @@ class MLPrediction(Base):
     alert = relationship("Alert", back_populates="ml_predictions")
 
 
+class ServiceHeartbeat(Base):
+    """Tracks heartbeats from streaming pipeline services (Spark, etc.)."""
+    __tablename__ = "service_heartbeats"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    service = Column(String(50), nullable=False, unique=True, index=True)
+    status = Column(String(50), nullable=False, default="running")
+    last_seen = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+
 class AuditLog(Base):
     """Audit log for tracking administrative actions."""
     __tablename__ = "audit_logs"

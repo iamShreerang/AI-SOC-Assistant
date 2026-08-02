@@ -1,0 +1,32 @@
+# Spark Structured Streaming job container.
+# Built FROM bitnamilegacy/spark (same image as spark-master/spark-worker in
+# docker-compose.yml — bitnami/spark itself moved behind a paid subscription
+# in 2025; bitnamilegacy/spark is the free, frozen-version fallback) so the
+# bundled JDK version matches what Spark 3.5 actually needs — running this
+# job against a locally-installed older JRE fails with
+# UnsupportedClassVersionError (class file 61 vs 55), which is exactly what
+# happened trying to run it outside Docker.
+FROM bitnamilegacy/spark:3.5.6
+
+USER root
+WORKDIR /app
+
+COPY streaming/requirements.txt streaming/requirements.txt
+# torch's default PyPI wheel pulls in the full NVIDIA CUDA toolkit
+# (~2GB: nvidia_cudnn, nvidia_cusparse, nvidia_nccl, ...) even though this
+# container never has GPU access — install the CPU-only build explicitly
+# first so the requirements.txt install below finds it already satisfied
+# and skips it.
+RUN pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu torch==2.2.2
+RUN pip install --no-cache-dir -r streaming/requirements.txt
+
+COPY streaming/ streaming/
+COPY ml/__init__.py ml/__init__.py
+COPY ml/model/ ml/model/
+COPY ml/preprocessing/ ml/preprocessing/
+COPY ml/inference/ ml/inference/
+COPY ml/saved_models/ ml/saved_models/
+
+ENV PYTHONUNBUFFERED=1
+
+ENTRYPOINT ["python", "streaming/spark/streaming_job.py"]

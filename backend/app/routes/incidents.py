@@ -58,19 +58,24 @@ async def create_incident(
     db: Session = Depends(get_db),
     _user=Depends(get_current_active_user)
 ):
+    from app.utils.config import settings
     incident = db_incident_service.create_incident(db, payload)
-    
-    # Auto-generate AI summary (non-blocking - failure won't block incident creation)
-    try:
-        summary = llm_service.generate_incident_summary(incident.model_dump(mode="json"))
-        if summary:
-            incident = db_incident_service.attach_summary(db, incident.id, summary)
-            logger.info(f"Auto-generated summary for incident {incident.id}")
-        else:
-            logger.info(f"Summary generation skipped for incident {incident.id}")
-    except Exception as e:
-        logger.warning(f"Summary generation failed for incident {incident.id}: {e}")
-    
+
+    # Auto-generate AI summary when enabled (non-blocking)
+    if settings.auto_incident_summary:
+        try:
+            summary = llm_service.generate_incident_summary({
+                "title": incident.title,
+                "description": incident.description,
+                "alert_ids": incident.alert_ids,
+                "status": incident.status.value if hasattr(incident.status, "value") else incident.status,
+            })
+            if summary:
+                incident = db_incident_service.attach_summary(db, incident.id, summary)
+                logger.info("Auto-generated summary for incident %d", incident.id)
+        except Exception as e:
+            logger.warning("Summary generation failed for incident %d: %s", incident.id, e)
+
     return incident
 
 

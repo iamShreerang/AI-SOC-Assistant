@@ -1,0 +1,49 @@
+# Repo-root .dockerignore — keeps `docker build` context light for images
+# built with `context: ..` from streaming/docker-compose.yml (and any future
+# backend/frontend compose services using the repo root as context).
+
+# Virtual environments
+.venv/
+venv/
+backend/venv/
+env/
+ENV/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Python cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Large ML datasets/artifacts — not needed inside containers; only
+# ml/model, ml/preprocessing, ml/inference, ml/saved_models are COPYed
+# explicitly by streaming/Dockerfile.spark.
+ml/data/
+ml/artifacts/
+ml/venv/
+
+# Node
+node_modules/
+frontend/node_modules/
+
+# IDE / OS
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs / env files
+*.log
+.env
+*.env
+!.env.example

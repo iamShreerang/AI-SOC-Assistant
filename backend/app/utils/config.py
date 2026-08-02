@@ -27,10 +27,11 @@ class Settings(BaseSettings):
 
     # Elasticsearch
     elasticsearch_url: str = "http://localhost:9200"
-    elasticsearch_enabled: bool = True  # Set to False to use in-memory storage
+    elasticsearch_enabled: bool = True  # Set to True to enable Elasticsearch dual-write
 
     # LLM
     groq_api_key: str = ""
+    auto_incident_summary: bool = True  # Auto-generate Groq summary on incident creation
 
     # OAuth2 Providers
     google_client_id: str = ""
@@ -43,7 +44,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3001", "http://localhost:5173", "http://localhost:8080"]
     
     # Frontend URL for OAuth redirects
-    frontend_url: str = "http://localhost:3001"
+    frontend_url: str = "http://localhost:3000"
 
     class Config:
         env_file = ".env"

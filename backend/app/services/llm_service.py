@@ -37,12 +37,17 @@ def generate_incident_summary(incident_data: dict) -> Optional[str]:
         logger.warning("Groq API key not configured - skipping summary generation")
         return None
     
+    title = incident_data.get("title", "Unknown Incident")
+    description = incident_data.get("description", "No additional details provided")
+    alert_count = len(incident_data.get("alert_ids", []))
+    status = incident_data.get("status", "open")
+
     prompt = f"""Analyze this security incident and provide a concise professional summary:
 
-Incident Title: {incident_data['title']}
-Description: {incident_data.get('description', 'No additional details provided')}
-Related Alerts: {len(incident_data.get('alert_ids', []))} alerts
-Current Status: {incident_data['status']}
+Incident Title: {title}
+Description: {description}
+Related Alerts: {alert_count} alerts
+Current Status: {status}
 
 Provide:
 1. Executive Summary (2-3 sentences)

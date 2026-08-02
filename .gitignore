@@ -258,3 +258,8 @@ out/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+#ML Files
+ml/data/
+**/__pycache__/
+*.py[cod]

@@ -116,6 +116,18 @@ def upgrade() -> None:
     op.create_index('ix_ml_predictions_alert_id', 'ml_predictions', ['alert_id'])
     op.create_index('ix_ml_predictions_created_at', 'ml_predictions', ['created_at'])
     
+    # Create service_heartbeats table (Spark liveness tracking)
+    op.create_table(
+        'service_heartbeats',
+        sa.Column('id', sa.Integer(), primary_key=True, autoincrement=True),
+        sa.Column('service', sa.String(50), nullable=False, unique=True),
+        sa.Column('status', sa.String(50), nullable=False),
+        sa.Column('last_seen', sa.DateTime(), nullable=False),
+    )
+    op.create_index('ix_service_heartbeats_id', 'service_heartbeats', ['id'])
+    op.create_index('ix_service_heartbeats_service', 'service_heartbeats', ['service'])
+    op.create_index('ix_service_heartbeats_last_seen', 'service_heartbeats', ['last_seen'])
+
     # Create audit_logs table
     op.create_table(
         'audit_logs',
@@ -139,6 +151,7 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # Drop tables
+    op.drop_table('service_heartbeats')
     op.drop_table('audit_logs')
     op.drop_table('ml_predictions')
     op.drop_table('incident_alerts')

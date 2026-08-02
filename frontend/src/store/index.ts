@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { User, Notification, UserSettings } from '@/types';
 
 interface AuthState {
@@ -10,32 +11,35 @@ interface AuthState {
   clearAuth: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  isAuthenticated: false,
-  accessToken: null,
-  refreshToken: null,
-  setAuth: (user, tokens) => {
-    localStorage.setItem('access_token', tokens.access_token);
-    localStorage.setItem('refresh_token', tokens.refresh_token);
-    set({
-      user,
-      isAuthenticated: true,
-      accessToken: tokens.access_token,
-      refreshToken: tokens.refresh_token,
-    });
-  },
-  clearAuth: () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    set({
-      user: null,
-      isAuthenticated: false,
-      accessToken: null,
-      refreshToken: null,
-    });
-  },
-}));
+export const useAuthStore = create<AuthState>()(persist(
+  (set) => ({
+    user: null,
+    isAuthenticated: false,
+    accessToken: null,
+    refreshToken: null,
+    setAuth: (user, tokens) => {
+      localStorage.setItem('access_token', tokens.access_token);
+      localStorage.setItem('refresh_token', tokens.refresh_token);
+      set({
+        user,
+        isAuthenticated: true,
+        accessToken: tokens.access_token,
+        refreshToken: tokens.refresh_token,
+      });
+    },
+    clearAuth: () => {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      set({
+        user: null,
+        isAuthenticated: false,
+        accessToken: null,
+        refreshToken: null,
+      });
+    },
+  }),
+  { name: 'auth-store' }
+));
 
 interface NotificationState {
   notifications: Notification[];

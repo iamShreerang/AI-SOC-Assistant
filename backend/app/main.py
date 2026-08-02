@@ -21,6 +21,7 @@ from app.routes.logs import router as logs_router, ingest_router as logs_ingest_
 from app.routes.alerts import router as alerts_router, ingest_router as alerts_ingest_router
 from app.routes.incidents import router as incidents_router, summaries_router
 from app.routes import stats, search, export, audit
+from app.routes.ingest_extra import router as ingest_extra_router
 
 logger = logging.getLogger(__name__)
 
@@ -202,6 +203,7 @@ app.include_router(audit.router, prefix="/audit", tags=["Audit"])
 app.include_router(logs_ingest_router, tags=["Ingest"])
 app.include_router(alerts_ingest_router, tags=["Ingest"])
 app.include_router(summaries_router, tags=["Ingest"])
+app.include_router(ingest_extra_router, tags=["Ingest"])
 
 
 @app.on_event("startup")

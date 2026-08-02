@@ -19,19 +19,28 @@ def test_post_incident_minimal(client, auth_headers):
 
 
 def test_post_incident_with_description_and_alerts(client, auth_headers):
+    # Create alerts first so the IDs actually exist
+    ids = []
+    for i in range(3):
+        r = client.post(
+            "/alerts/",
+            json={"title": f"Alert {i}", "severity": "high", "source": "test"},
+            headers=auth_headers,
+        )
+        ids.append(r.json()["id"])
     resp = client.post(
         "/incidents/",
         json={
             "title": "Data exfiltration",
             "description": "Large outbound transfer detected",
-            "alert_ids": [1, 2, 3],
+            "alert_ids": ids,
         },
         headers=auth_headers,
     )
     assert resp.status_code == 201
     body = resp.json()
     assert body["description"] == "Large outbound transfer detected"
-    assert body["alert_ids"] == [1, 2, 3]
+    assert sorted(body["alert_ids"]) == sorted(ids)
 
 
 def test_post_incident_missing_title(client, auth_headers):
