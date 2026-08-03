@@ -36,8 +36,18 @@ def generate_record() -> dict:
     label = 0 if attack_cat == "Normal" else 1
     is_attack = label == 1
 
+    if attack_cat == "Normal":
+        severity = "info"
+    elif attack_cat in ["Reconnaissance", "Analysis", "Generic"]:
+        severity = "warning"
+    elif attack_cat in ["Exploits", "Fuzzers", "DoS"]:
+        severity = "error"
+    else:
+        severity = "critical"
+
     return {
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "severity": severity,
         "srcip": _rand_ip(),
         "dstip": _rand_ip(),
         "sport": random.randint(1024, 65535),
@@ -105,12 +115,12 @@ def stream_to_kafka(broker: str, topic: str, delay: float = 0.5) -> None:
         bootstrap_servers=[broker],
         value_serializer=lambda v: json.dumps(v).encode("utf-8"),
     )
-    print(f"Streaming to Kafka {broker} → {topic}  (Ctrl+C to stop)")
+    print(f"Streaming to Kafka {broker} → {topic}  (delay={delay}s | Ctrl+C to stop)")
     try:
         while True:
             record = generate_record()
             producer.send(topic, record)
-            print(f"  sent: {record['srcip']} → {record['dstip']} | {record['attack_cat']}")
+            print(f"  sent [{record['severity'].upper()}]: {record['srcip']} → {record['dstip']} | {record['attack_cat']}")
             time.sleep(delay)
     except KeyboardInterrupt:
         producer.flush()
@@ -122,13 +132,18 @@ if __name__ == "__main__":
     parser.add_argument("--kafka", action="store_true", help="Stream to Kafka")
     parser.add_argument("--broker", default="localhost:9092")
     parser.add_argument("--topic", default="unsw-logs")
-    parser.add_argument("--delay", type=float, default=0.5)
+    parser.add_argument("--delay", type=float, default=0.5, help="Delay between records in seconds")
+    parser.add_argument("--rate", type=float, default=None, help="Rate in records/sec (e.g. --rate 5)")
     parser.add_argument("--batch", type=int, default=200, help="Records per file batch")
     args = parser.parse_args()
+
+    delay = args.delay
+    if args.rate is not None and args.rate > 0:
+        delay = 1.0 / args.rate
 
     out_dir = Path(__file__).parent
     out_file = write_batch(out_dir, args.batch)
     print(f"Written {args.batch} records to {out_file}")
 
     if args.kafka:
-        stream_to_kafka(args.broker, args.topic, args.delay)
+        stream_to_kafka(args.broker, args.topic, delay)

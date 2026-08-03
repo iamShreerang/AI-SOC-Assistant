@@ -7,26 +7,12 @@ from app.schemas.enums import AlertSeverity, AlertStatus
 class AlertCreate(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
-            "examples": [
-                {
-                    "summary": "Brute-force alert (manual)",
-                    "value": {
-                        "title": "SSH Brute Force Detected",
-                        "severity": "high",
-                        "source": "auth-service",
-                        "description": "15 failed login attempts from 198.51.100.42 in 60 seconds",
-                    },
-                },
-                {
-                    "summary": "ML anomaly alert (from /ingest/alerts)",
-                    "value": {
-                        "title": "Anomalous outbound traffic spike",
-                        "severity": "critical",
-                        "source": "ml-anomaly-detector",
-                        "description": "Outbound bytes exceeded 3σ threshold on interface eth0",
-                    },
-                },
-            ]
+            "example": {
+                "title": "SSH Brute Force Detected",
+                "severity": "high",
+                "source": "auth-service",
+                "description": "15 failed login attempts from 198.51.100.42 in 60 seconds",
+            }
         }
     )
 
@@ -39,10 +25,7 @@ class AlertCreate(BaseModel):
 class AlertUpdate(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
-            "examples": [
-                {"summary": "Acknowledge", "value": {"status": "acknowledged"}},
-                {"summary": "Resolve", "value": {"status": "resolved"}},
-            ]
+            "example": {"status": "acknowledged"}
         }
     )
 

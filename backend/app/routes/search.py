@@ -63,22 +63,20 @@ async def search_incidents(
 
 
 @router.get(
-    "",
-    response_model=Dict,
-    summary="Global search root",
-    description="Search across all entities (logs, alerts, incidents) at once.",
-)
-@router.get(
-    "/",
-    response_model=Dict,
-    summary="Global search root trailing slash",
-    description="Search across all entities (logs, alerts, incidents) at once.",
-)
-@router.get(
     "/all",
     response_model=Dict,
     summary="Global search",
     description="Search across all entities (logs, alerts, incidents) at once.",
+)
+@router.get(
+    "",
+    response_model=Dict,
+    include_in_schema=False,
+)
+@router.get(
+    "/",
+    response_model=Dict,
+    include_in_schema=False,
 )
 async def global_search(
     q: str = Query(..., description="Search query", min_length=1),

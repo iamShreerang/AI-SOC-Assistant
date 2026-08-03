@@ -20,12 +20,9 @@ class AuditLogListResponse(BaseModel):
     limit: int
 
 
-@router.get(
-    "/",
-    response_model=AuditLogListResponse,
-    summary="Get audit logs (admin only)",
-    description="Retrieve audit logs with optional filtering by username, action, or resource type.",
-)
+@router.get("/logs", response_model=AuditLogListResponse, summary="Get audit logs (admin only)")
+@router.get("", response_model=AuditLogListResponse, include_in_schema=False)
+@router.get("/", response_model=AuditLogListResponse, include_in_schema=False)
 async def get_audit_trail(
     limit: int = 100,
     skip: int = 0,

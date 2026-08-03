@@ -26,7 +26,8 @@ class IncidentListResponse(BaseModel):
     limit: int
 
 
-@router.get("/", response_model=IncidentListResponse)
+@router.get("", response_model=IncidentListResponse)
+@router.get("/", response_model=IncidentListResponse, include_in_schema=False)
 async def get_incidents(
     limit: int = 100,
     skip: int = 0,
@@ -52,7 +53,8 @@ async def get_incident(
     return incident
 
 
-@router.post("/", response_model=IncidentResponse, status_code=201)
+@router.post("", response_model=IncidentResponse, status_code=201)
+@router.post("/", response_model=IncidentResponse, status_code=201, include_in_schema=False)
 async def create_incident(
     payload: IncidentCreate,
     db: Session = Depends(get_db),

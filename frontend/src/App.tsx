@@ -34,8 +34,6 @@ function App() {
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    // Clear any stale local storage tokens on app initialization to disable auto-login
-    localStorage.removeItem('auth-store');
     setIsInitializing(false);
   }, []);
 

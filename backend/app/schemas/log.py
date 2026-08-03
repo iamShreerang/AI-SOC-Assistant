@@ -7,26 +7,13 @@ from app.schemas.enums import LogSeverity
 class LogCreate(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
-            "examples": [
-                {
-                    "summary": "Firewall block event",
-                    "value": {
-                        "source": "firewall-01",
-                        "severity": "high",
-                        "message": "Inbound connection blocked from 198.51.100.42:4444",
-                        "timestamp": "2024-06-01T14:32:00Z",
-                        "raw": "Jun  1 14:32:00 fw01 kernel: DROP IN=eth0 SRC=198.51.100.42 DST=10.0.0.5 DPT=4444",
-                    },
-                },
-                {
-                    "summary": "Minimal log (Kafka consumer)",
-                    "value": {
-                        "source": "kafka-consumer",
-                        "severity": "info",
-                        "message": "User login from 10.0.0.12",
-                    },
-                },
-            ]
+            "example": {
+                "source": "firewall-01",
+                "severity": "error",
+                "message": "Inbound connection blocked from 198.51.100.42:4444",
+                "timestamp": "2026-08-03T14:32:00Z",
+                "raw": "Jun 1 14:32:00 fw01 kernel: DROP IN=eth0 SRC=198.51.100.42 DST=10.0.0.5 DPT=4444",
+            }
         }
     )
 

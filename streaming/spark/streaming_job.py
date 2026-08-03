@@ -350,12 +350,13 @@ def _publish_predictions(predictions: list[dict]) -> None:
 
 
 def _kafka_stream(spark: SparkSession) -> DataFrame:
+    starting_offsets = os.getenv("STARTING_OFFSETS", "latest")
     raw = (
         spark.readStream
         .format("kafka")
         .option("kafka.bootstrap.servers", KAFKA_BROKER)
         .option("subscribe", KAFKA_INPUT_TOPIC)
-        .option("startingOffsets", "earliest")
+        .option("startingOffsets", starting_offsets)
         .option("failOnDataLoss", "false")
         .load()
     )

@@ -1,3 +1,4 @@
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -98,8 +99,38 @@ Returns `401 Unauthorized` if credentials are invalid.
     },
 )
 @limiter.limit("10/minute")
-def login(request: Request, credentials: UserLogin, db: Session = Depends(get_db)):
-    user = db_auth_service.authenticate_user(db, credentials.username, credentials.password)
+async def login(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    username = None
+    password = None
+
+    # Parse content-type dynamically (supports both JSON and OAuth2 Form Data)
+    content_type = request.headers.get("content-type", "")
+    if "x-www-form-urlencoded" in content_type or "multipart/form-data" in content_type:
+        try:
+            form = await request.form()
+            username = form.get("username")
+            password = form.get("password")
+        except Exception:
+            pass
+    else:
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                username = body.get("username")
+                password = body.get("password")
+        except Exception:
+            pass
+
+    if not username or not password:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Username and password are required",
+        )
+
+    user = db_auth_service.authenticate_user(db, username, password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

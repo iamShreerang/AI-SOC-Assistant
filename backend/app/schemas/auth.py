@@ -6,16 +6,11 @@ from app.schemas.enums import UserRole
 class UserRegister(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
-            "examples": [
-                {
-                    "summary": "Register an analyst",
-                    "value": {"username": "jsmith", "password": "S3cur3P@ss!", "role": "analyst"},
-                },
-                {
-                    "summary": "Register an admin",
-                    "value": {"username": "soc_admin", "password": "Adm1nP@ss!", "role": "admin"},
-                },
-            ]
+            "example": {
+                "username": "analyst",
+                "password": "analyst123",
+                "role": "analyst",
+            }
         }
     )
 
@@ -27,12 +22,10 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
-            "examples": [
-                {
-                    "summary": "Analyst login",
-                    "value": {"username": "analyst", "password": "analyst123"},
-                }
-            ]
+            "example": {
+                "username": "analyst",
+                "password": "analyst123",
+            }
         }
     )
 
@@ -43,7 +36,7 @@ class UserLogin(BaseModel):
 class UserResponse(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
-            "examples": [{"username": "jsmith", "role": "analyst", "is_active": True}]
+            "example": {"username": "analyst", "role": "analyst", "is_active": True}
         }
     )
 
@@ -55,9 +48,11 @@ class UserResponse(BaseModel):
 class Token(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
-            "examples": [
-                {"access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...", "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...", "token_type": "bearer"}
-            ]
+            "example": {
+                "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                "token_type": "bearer",
+            }
         }
     )
 

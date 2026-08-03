@@ -23,7 +23,8 @@ class LogListResponse(BaseModel):
     limit: int
 
 
-@router.get("/", response_model=LogListResponse)
+@router.get("", response_model=LogListResponse)
+@router.get("/", response_model=LogListResponse, include_in_schema=False)
 async def get_logs(
     limit: int = 100,
     skip: int = 0,
@@ -50,7 +51,8 @@ async def get_log_by_id(
     return log
 
 
-@router.post("/", response_model=LogResponse, status_code=201)
+@router.post("", response_model=LogResponse, status_code=201)
+@router.post("/", response_model=LogResponse, status_code=201, include_in_schema=False)
 async def ingest_log(
     payload: LogCreate,
     db: Session = Depends(get_db),
@@ -60,5 +62,6 @@ async def ingest_log(
 
 
 @ingest_router.post("/logs", response_model=LogResponse, status_code=201)
+@ingest_router.post("/logs/", response_model=LogResponse, status_code=201, include_in_schema=False)
 async def ingest_log_no_auth(payload: LogCreate, db: Session = Depends(get_db)):
     return db_log_service.create_log(db, payload)

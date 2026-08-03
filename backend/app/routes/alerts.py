@@ -29,7 +29,8 @@ class BulkAlertUpdate(BaseModel):
     status: AlertStatus = Field(..., description="New status for all alerts")
 
 
-@router.get("/", response_model=AlertListResponse)
+@router.get("", response_model=AlertListResponse)
+@router.get("/", response_model=AlertListResponse, include_in_schema=False)
 async def get_alerts(
     limit: int = 100,
     skip: int = 0,
@@ -59,7 +60,8 @@ async def get_alert_by_id(
     return alert
 
 
-@router.post("/", response_model=AlertResponse, status_code=201)
+@router.post("", response_model=AlertResponse, status_code=201)
+@router.post("/", response_model=AlertResponse, status_code=201, include_in_schema=False)
 async def create_alert(
     payload: AlertCreate,
     db: Session = Depends(get_db),
@@ -95,5 +97,6 @@ async def bulk_update_alerts(
 
 
 @ingest_router.post("/alerts", response_model=AlertResponse, status_code=201)
+@ingest_router.post("/alerts/", response_model=AlertResponse, status_code=201, include_in_schema=False)
 async def ingest_alert_no_auth(payload: AlertCreate, db: Session = Depends(get_db)):
     return db_alert_service.create_alert(db, payload)

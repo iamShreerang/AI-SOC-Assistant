@@ -7,20 +7,11 @@ from app.schemas.enums import IncidentStatus
 class IncidentCreate(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
-            "examples": [
-                {
-                    "summary": "Ransomware incident",
-                    "value": {
-                        "title": "Ransomware Outbreak — Host cluster A",
-                        "description": "Three hosts encrypted within 10 minutes; lateral movement detected",
-                        "alert_ids": [12, 13, 15],
-                    },
-                },
-                {
-                    "summary": "Minimal incident",
-                    "value": {"title": "Suspicious login from unknown country"},
-                },
-            ]
+            "example": {
+                "title": "Ransomware Outbreak — Host cluster A",
+                "description": "Three hosts encrypted within 10 minutes; lateral movement detected",
+                "alert_ids": [],
+            }
         }
     )
 

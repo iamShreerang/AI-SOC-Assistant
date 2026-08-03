@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -17,12 +17,42 @@ router = APIRouter(prefix="/ingest")
 
 
 class HeartbeatPayload(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "service": "spark",
+                "status": "running",
+                "timestamp": "2026-08-03T17:00:00Z"
+            }
+        }
+    )
     service: str
     status: str = "running"
     timestamp: str = ""
 
 
 class MetricsPayload(BaseModel):
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "total_requests": 12000,
+                "attack_count": 54,
+                "normal_count": 11946,
+                "requests_per_second": 45.2,
+                "requests_per_minute": 2712.0,
+                "avg_inference_latency_ms": 3.5,
+                "unique_src_ips": 120,
+                "unique_dst_ips": 45,
+                "suspicious_ip_count": 8,
+                "total_bytes_transferred": 15480000,
+                "avg_packet_size": 1290.0,
+                "alerts_critical": 12,
+                "alerts_high": 42,
+                "alerts_medium": 0,
+                "alerts_low": 0,
+            }
+        }
+    )
     total_requests: int = 0
     attack_count: int = 0
     normal_count: int = 0
@@ -41,6 +71,7 @@ class MetricsPayload(BaseModel):
 
 
 @router.post("/heartbeat", status_code=200)
+@router.post("/heartbeat/", status_code=200, include_in_schema=False)
 async def receive_heartbeat(
     payload: HeartbeatPayload,
     db: Session = Depends(get_db),
@@ -73,6 +104,7 @@ async def receive_heartbeat(
 
 
 @router.post("/metrics", status_code=200)
+@router.post("/metrics/", status_code=200, include_in_schema=False)
 async def receive_metrics(payload: MetricsPayload):
     """
     Called by the Spark streaming job to publish pipeline metrics.
