@@ -5,21 +5,26 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
-import { useFetch } from '@/hooks';
+import { usePolling } from '@/hooks';
 import { apiService } from '@/services/api';
 import { formatDate, getStatusBgColor } from '@/utils/helpers';
-import { Filter, ExternalLink, Plus } from 'lucide-react';
+import { Filter, ExternalLink, Plus, X } from 'lucide-react';
 import { IncidentStatus } from '@/types';
+import { useNotificationStore } from '@/store';
 
 export const Incidents = () => {
   const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<IncidentStatus | ''>('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [alertIdsInput, setAlertIdsInput] = useState('');
+  const [creating, setCreating] = useState(false);
+  const { addNotification } = useNotificationStore();
 
-  const { data: incidents, loading, refetch } = useFetch(() =>
-    apiService.getIncidents({
-      status: statusFilter || undefined,
-    }),
-    [statusFilter]
+  const { data: incidents, loading, refetch } = usePolling(
+    () => apiService.getIncidents({ status: statusFilter || undefined }),
+    3000
   );
 
   const handleStatusUpdate = async (id: number, status: IncidentStatus) => {
@@ -31,6 +36,45 @@ export const Incidents = () => {
     }
   };
 
+  const handleCreateIncident = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim()) return;
+
+    try {
+      setCreating(true);
+      const alertIds = alertIdsInput
+        .split(',')
+        .map((id) => parseInt(id.trim(), 10))
+        .filter((num) => !isNaN(num));
+
+      await apiService.createIncident({
+        title: title.trim(),
+        description: description.trim(),
+        alert_ids: alertIds,
+      });
+
+      addNotification({
+        type: 'success',
+        title: 'Incident Created',
+        message: 'Security incident created successfully with Groq AI summary.',
+      });
+
+      setTitle('');
+      setDescription('');
+      setAlertIdsInput('');
+      setIsModalOpen(false);
+      refetch();
+    } catch (err: any) {
+      addNotification({
+        type: 'error',
+        title: 'Creation Failed',
+        message: err.response?.data?.detail || err.message || 'Failed to create incident',
+      });
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <MainLayout>
       <div className="space-y-6">
@@ -39,7 +83,7 @@ export const Incidents = () => {
             <h1 className="text-3xl font-bold text-soc-text-primary">Incident Management</h1>
             <p className="text-soc-text-muted mt-2">Track and manage security incidents</p>
           </div>
-          <Button variant="primary">
+          <Button variant="primary" onClick={() => setIsModalOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Create Incident
           </Button>
@@ -144,6 +188,73 @@ export const Incidents = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Create Incident Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-soc-bg-secondary border border-soc-border rounded-xl w-full max-w-lg shadow-2xl p-6 relative animate-in fade-in zoom-in duration-200">
+            <button
+              onClick={() => setIsModalOpen(false)}
+              className="absolute top-4 right-4 text-soc-text-muted hover:text-soc-text-primary"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h2 className="text-xl font-bold text-soc-text-primary mb-4">Create Security Incident</h2>
+
+            <form onSubmit={handleCreateIncident} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-soc-text-secondary mb-1">
+                  Incident Title <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Critical Ransomware Activity Detected on Host"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-soc-bg-tertiary border border-soc-border rounded-lg text-soc-text-primary focus:outline-none focus:ring-2 focus:ring-soc-accent-cyan"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-soc-text-secondary mb-1">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Describe the incident details, affected systems, or context..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  className="w-full px-3 py-2 bg-soc-bg-tertiary border border-soc-border rounded-lg text-soc-text-primary focus:outline-none focus:ring-2 focus:ring-soc-accent-cyan"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-soc-text-secondary mb-1">
+                  Related Alert IDs (comma separated)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 38, 39, 40"
+                  value={alertIdsInput}
+                  onChange={(e) => setAlertIdsInput(e.target.value)}
+                  className="w-full px-3 py-2 bg-soc-bg-tertiary border border-soc-border rounded-lg text-soc-text-primary focus:outline-none focus:ring-2 focus:ring-soc-accent-cyan"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <Button type="button" variant="secondary" onClick={() => setIsModalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" variant="primary" disabled={creating}>
+                  {creating ? <Spinner size="sm" className="mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                  Create & Generate AI Summary
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 };

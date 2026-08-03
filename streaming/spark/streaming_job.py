@@ -273,33 +273,34 @@ def _process_batch(batch_df: DataFrame, batch_id: int) -> None:
         snap["avg_inference_latency_ms"], len(alerts),
     )
 
-    # ── Persist attack-flagged records into the backend ─────────────────────
+    # ── Persist stream records into the backend database ────────────────────
     log_count = 0
     for rec in enriched:
-        if rec.get("label") == 1:
-            severity = "critical" if rec.get("confidence", 0) >= 0.9 else "warning"
-            msg = (
-                f"ML-flagged attack: {rec.get('srcip')} -> {rec.get('dstip')} "
-                f"[{rec.get('attack_cat') or 'unknown'}] "
-                f"confidence={rec.get('confidence', 0):.2f}"
-            )
-            ok = backend_client.post_log(
-                source="spark-streaming",
-                severity=severity,
-                message=msg,
-                timestamp=rec.get("timestamp") or None,
-                raw=json.dumps({
-                    k: rec[k] for k in
-                    ("srcip", "dstip", "sport", "dsport", "proto",
-                     "label", "confidence", "attack_probability", "attack_cat")
-                    if k in rec
-                }),
-            )
-            if ok:
-                log_count += 1
+        is_attack = rec.get("label") == 1 or (rec.get("attack_cat") and rec.get("attack_cat") != "Normal")
+        if is_attack:
+            severity = "critical" if rec.get("confidence", 0) >= 0.8 else "warning"
+            msg = f"ML Attack Detected [{rec.get('attack_cat') or 'Threat'}]: {rec.get('srcip')}:{rec.get('sport')} -> {rec.get('dstip')}:{rec.get('dsport')} ({rec.get('proto')})"
+        else:
+            severity = "info"
+            msg = f"Network Traffic: {rec.get('srcip')}:{rec.get('sport')} -> {rec.get('dstip')}:{rec.get('dsport')} ({rec.get('proto')})"
+
+        ok = backend_client.post_log(
+            source="spark-streaming",
+            severity=severity,
+            message=msg,
+            timestamp=rec.get("timestamp") or None,
+            raw=json.dumps({
+                k: rec[k] for k in
+                ("srcip", "dstip", "sport", "dsport", "proto",
+                 "label", "confidence", "attack_probability", "attack_cat")
+                if k in rec
+            }),
+        )
+        if ok:
+            log_count += 1
 
     if log_count:
-        logger.info("Sent %d attack logs to backend /ingest/logs", log_count)
+        logger.info("Sent %d stream logs to backend /ingest/logs", log_count)
 
     # ── Persist generated alerts into the backend ────────────────────────────
     alert_count = 0
@@ -354,11 +355,11 @@ def _kafka_stream(spark: SparkSession) -> DataFrame:
         .format("kafka")
         .option("kafka.bootstrap.servers", KAFKA_BROKER)
         .option("subscribe", KAFKA_INPUT_TOPIC)
-        .option("startingOffsets", "latest")
+        .option("startingOffsets", "earliest")
         .option("failOnDataLoss", "false")
         .load()
     )
-    parsed = raw.select(F.from_json(F.col("value").cast("string"), _LOG_SCHEMA).alias("data"))
+    parsed = raw.select(F.from_json(F.col("value").cast("string"), _LOG_SCHEMA, {"mode": "PERMISSIVE"}).alias("data"))
     return parsed.filter(F.col("data").isNotNull()).select("data.*")
 
 
@@ -380,6 +381,12 @@ def _file_stream(spark: SparkSession) -> DataFrame:
 def _heartbeat_loop() -> None:
     """Background thread: POST /ingest/heartbeat every _HEARTBEAT_INTERVAL_SECS."""
     logger.info("Heartbeat thread started (interval=%ds)", _HEARTBEAT_INTERVAL_SECS)
+    # Send immediate heartbeat on startup so health check turns green instantly
+    try:
+        backend_client.post_heartbeat(service="spark", status="running")
+    except Exception as e:
+        logger.warning("Initial heartbeat POST failed: %s", e)
+
     while True:
         time.sleep(_HEARTBEAT_INTERVAL_SECS)
         try:

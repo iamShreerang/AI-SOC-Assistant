@@ -11,35 +11,33 @@ interface AuthState {
   clearAuth: () => void;
 }
 
-export const useAuthStore = create<AuthState>()(persist(
-  (set) => ({
-    user: null,
-    isAuthenticated: false,
-    accessToken: null,
-    refreshToken: null,
-    setAuth: (user, tokens) => {
-      localStorage.setItem('access_token', tokens.access_token);
-      localStorage.setItem('refresh_token', tokens.refresh_token);
-      set({
-        user,
-        isAuthenticated: true,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-      });
-    },
-    clearAuth: () => {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      set({
-        user: null,
-        isAuthenticated: false,
-        accessToken: null,
-        refreshToken: null,
-      });
-    },
-  }),
-  { name: 'auth-store' }
-));
+export const useAuthStore = create<AuthState>()((set) => ({
+  user: null,
+  isAuthenticated: false,
+  accessToken: null,
+  refreshToken: null,
+  setAuth: (user, tokens) => {
+    localStorage.setItem('access_token', tokens.access_token);
+    localStorage.setItem('refresh_token', tokens.refresh_token);
+    set({
+      user,
+      isAuthenticated: true,
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+    });
+  },
+  clearAuth: () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('auth-store');
+    set({
+      user: null,
+      isAuthenticated: false,
+      accessToken: null,
+      refreshToken: null,
+    });
+  },
+}));
 
 interface NotificationState {
   notifications: Notification[];
@@ -85,17 +83,20 @@ const defaultSettings: UserSettings = {
   notifications_enabled: true,
   email_notifications: false,
   auto_refresh: true,
-  refresh_interval: 30000, // 30 seconds
+  refresh_interval: 5000, // 5 seconds default
   theme: 'dark',
 };
 
-export const useSettingsStore = create<SettingsState>((set) => ({
-  settings: defaultSettings,
-  updateSettings: (newSettings) =>
-    set((state) => ({
-      settings: { ...state.settings, ...newSettings },
-    })),
-}));
+export const useSettingsStore = create<SettingsState>()(persist(
+  (set) => ({
+    settings: defaultSettings,
+    updateSettings: (newSettings) =>
+      set((state) => ({
+        settings: { ...state.settings, ...newSettings },
+      })),
+  }),
+  { name: 'settings-store' }
+));
 
 interface UIState {
   sidebarOpen: boolean;

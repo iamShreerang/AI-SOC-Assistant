@@ -1,12 +1,25 @@
 import { format, formatDistanceToNow } from 'date-fns';
 import { AlertSeverity, AlertStatus, IncidentStatus, LogSeverity } from '@/types';
 
+const ensureUtcDate = (date: string | Date): Date => {
+  if (date instanceof Date) return date;
+  if (!date) return new Date();
+  let str = String(date).trim();
+  // If string has no timezone suffix ('Z' or '+/-HH:MM'), append 'Z' so JS treats as UTC
+  if (!str.endsWith('Z') && !/[+-]\d{2}:?\d{2}$/.test(str)) {
+    str += 'Z';
+  }
+  return new Date(str);
+};
+
 export const formatDate = (date: string | Date): string => {
-  return format(new Date(date), 'MMM dd, yyyy HH:mm:ss');
+  const d = ensureUtcDate(date);
+  return format(d, 'MMM dd, yyyy HH:mm:ss');
 };
 
 export const formatRelativeTime = (date: string | Date): string => {
-  return formatDistanceToNow(new Date(date), { addSuffix: true });
+  const d = ensureUtcDate(date);
+  return formatDistanceToNow(d, { addSuffix: true });
 };
 
 export const getSeverityColor = (severity: AlertSeverity | LogSeverity): string => {

@@ -99,3 +99,26 @@ async def receive_summary(payload: LLMSummary, db: Session = Depends(get_db)):
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
     return incident
+
+
+@router.post("/{incident_id}/generate-summary", response_model=IncidentResponse)
+async def generate_summary_for_incident(
+    incident_id: int,
+    db: Session = Depends(get_db),
+    _user=Depends(get_current_active_user),
+):
+    """Generate or re-generate an AI LLM summary for a specific incident."""
+    incident = db_incident_service.get_incident_by_id(db, incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    summary = llm_service.generate_incident_summary({
+        "title": incident.title,
+        "description": incident.description,
+        "alert_ids": incident.alert_ids,
+        "status": incident.status.value if hasattr(incident.status, "value") else incident.status,
+    })
+    if not summary:
+        raise HTTPException(status_code=500, detail="Failed to generate AI summary. Ensure GROQ_API_KEY is configured.")
+    updated = db_incident_service.attach_summary(db, incident.id, summary)
+    return updated
+

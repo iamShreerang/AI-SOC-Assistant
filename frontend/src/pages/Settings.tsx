@@ -127,7 +127,7 @@ export const Settings = () => {
                 </label>
                 <Input
                   type="number"
-                  min="10"
+                  min="5"
                   max="300"
                   value={settings.refresh_interval / 1000}
                   onChange={(e) => updateSettings({ refresh_interval: Number(e.target.value) * 1000 })}

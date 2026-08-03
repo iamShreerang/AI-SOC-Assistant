@@ -49,7 +49,10 @@ def _install_shutdown_handler() -> None:
 def get_producer(broker: str):
     """Create KafkaProducer with retries on connection failure."""
     from kafka import KafkaProducer
-    from kafka.errors import NoBrokersAvailable
+    try:
+        from kafka.errors import NoBrokersAvailable
+    except ImportError:
+        from kafka.errors import KafkaError as NoBrokersAvailable
 
     for attempt in range(1, _CONNECT_MAX_RETRIES + 1):
         try:

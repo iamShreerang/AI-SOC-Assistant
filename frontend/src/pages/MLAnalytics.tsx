@@ -24,7 +24,7 @@ export const MLAnalytics = () => {
     <MainLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-soc-text-primary">ML Analytics</h1>
+          <h1 className="text-3xl font-bold text-soc-text-primary">Analytics</h1>
           <p className="text-soc-text-muted mt-2">Machine learning insights derived from live security data</p>
         </div>
 

@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Spark is considered healthy if its last heartbeat arrived within this window.
-_SPARK_HEARTBEAT_STALE_SECS = 120
+# Spark is considered healthy if its last heartbeat arrived within this window (45 seconds).
+_SPARK_HEARTBEAT_STALE_SECS = 45
 
 
 def _check_kafka() -> bool:

@@ -130,14 +130,14 @@ def search_incidents_db(query: str, limit: int = 50, db: Optional[Session] = Non
 # ── Active Search Interface with Fallback ──────────────────────────────────
 
 def search_logs(query: str, limit: int = 50, db: Optional[Session] = None) -> List[LogResponse]:
-    """Search logs with Elasticsearch, falling back to PostgreSQL if unavailable."""
+    """Search logs with Elasticsearch, falling back to PostgreSQL if unavailable or empty."""
     if settings.elasticsearch_enabled:
         try:
             from app.utils.elasticsearch_client import check_es_connection
             if check_es_connection():
                 from app.services import es_log_service
                 results = es_log_service.search_logs_direct(query, limit)
-                if results is not None:
+                if results:
                     return results
         except Exception as e:
             logger.warning(f"Elasticsearch log search failed, falling back to SQL: {e}")
@@ -146,14 +146,14 @@ def search_logs(query: str, limit: int = 50, db: Optional[Session] = None) -> Li
 
 
 def search_alerts(query: str, limit: int = 50, db: Optional[Session] = None) -> List[AlertResponse]:
-    """Search alerts with Elasticsearch, falling back to PostgreSQL if unavailable."""
+    """Search alerts with Elasticsearch, falling back to PostgreSQL if unavailable or empty."""
     if settings.elasticsearch_enabled:
         try:
             from app.utils.elasticsearch_client import check_es_connection
             if check_es_connection():
                 from app.services import es_alert_service
                 results = es_alert_service.search_alerts_direct(query, limit)
-                if results is not None:
+                if results:
                     return results
         except Exception as e:
             logger.warning(f"Elasticsearch alert search failed, falling back to SQL: {e}")
@@ -162,14 +162,14 @@ def search_alerts(query: str, limit: int = 50, db: Optional[Session] = None) -> 
 
 
 def search_incidents(query: str, limit: int = 50, db: Optional[Session] = None) -> List[IncidentResponse]:
-    """Search incidents with Elasticsearch, falling back to PostgreSQL if unavailable."""
+    """Search incidents with Elasticsearch, falling back to PostgreSQL if unavailable or empty."""
     if settings.elasticsearch_enabled:
         try:
             from app.utils.elasticsearch_client import check_es_connection
             if check_es_connection():
                 from app.services import es_incident_service
                 results = es_incident_service.search_incidents_direct(query, limit)
-                if results is not None:
+                if results:
                     return results
         except Exception as e:
             logger.warning(f"Elasticsearch incident search failed, falling back to SQL: {e}")

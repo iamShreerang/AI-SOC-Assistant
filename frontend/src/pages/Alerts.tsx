@@ -5,7 +5,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
-import { useFetch } from '@/hooks';
+import { usePolling } from '@/hooks';
 import { apiService } from '@/services/api';
 import { formatDate, getSeverityBgColor, getStatusBgColor } from '@/utils/helpers';
 import { Filter, ExternalLink } from 'lucide-react';
@@ -16,12 +16,12 @@ export const Alerts = () => {
   const [severityFilter, setSeverityFilter] = useState<AlertSeverity | ''>('');
   const [statusFilter, setStatusFilter] = useState<AlertStatus | ''>('');
 
-  const { data: alerts, loading, refetch } = useFetch(() =>
+  const { data: alerts, loading, refetch } = usePolling(() =>
     apiService.getAlerts({
       severity: severityFilter || undefined,
       status: statusFilter || undefined,
     }),
-    [severityFilter, statusFilter]
+    10000
   );
 
   const handleStatusUpdate = async (id: number, status: AlertStatus) => {

@@ -20,7 +20,7 @@ def get_es_client() -> Optional[Elasticsearch]:
                 [settings.elasticsearch_url],
                 verify_certs=False,       # No TLS in local dev
                 ssl_show_warn=False,      # Suppress SSL warnings
-                request_timeout=30,
+                request_timeout=2,        # Short timeout so /health never blocks
             )
             
             # Test connection
@@ -38,8 +38,11 @@ def get_es_client() -> Optional[Elasticsearch]:
 
 def check_es_connection() -> bool:
     """Check if Elasticsearch is available."""
-    client = get_es_client()
-    return client is not None and client.ping()
+    try:
+        client = get_es_client()
+        return client is not None and client.ping(request_timeout=2)
+    except Exception:
+        return False
 
 
 def create_indices():

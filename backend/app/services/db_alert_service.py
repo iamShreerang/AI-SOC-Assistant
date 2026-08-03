@@ -29,6 +29,34 @@ def create_alert(db: Session, payload: AlertCreate) -> AlertResponse:
     db.commit()
     db.refresh(db_alert)
     
+    # Auto-create real-time Incident for High and Critical alerts
+    sev_str = db_alert.severity.value if hasattr(db_alert.severity, 'value') else str(db_alert.severity)
+    if sev_str.lower() in ("critical", "high"):
+        try:
+            from app.services.db_incident_service import create_incident, attach_summary
+            from app.services.llm_service import generate_incident_summary
+            from app.schemas.incident import IncidentCreate
+            
+            inc_payload = IncidentCreate(
+                title=f"AUTOMATED INCIDENT: {db_alert.title}",
+                description=f"Auto-generated real-time incident triggered by {sev_str.upper()} alert (Source: {db_alert.source})",
+                alert_ids=[db_alert.id],
+            )
+            new_inc = create_incident(db, inc_payload)
+            logger.info("Auto-created real-time Incident #%d for critical alert #%d", new_inc.id, db_alert.id)
+            
+            if settings.auto_incident_summary:
+                summary = generate_incident_summary({
+                    "title": new_inc.title,
+                    "description": new_inc.description,
+                    "alert_ids": new_inc.alert_ids,
+                    "status": "open",
+                })
+                if summary:
+                    attach_summary(db, new_inc.id, summary)
+        except Exception as e:
+            logger.warning("Failed to auto-create real-time incident for critical alert #%d: %s", db_alert.id, e)
+    
     # Elasticsearch dual-write
     if settings.elasticsearch_enabled:
         try:

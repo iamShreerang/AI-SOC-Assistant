@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
-import { useFetch } from '@/hooks';
+import { usePolling } from '@/hooks';
 import { apiService } from '@/services/api';
 import { formatDate, getSeverityBgColor } from '@/utils/helpers';
 import { Search, Filter, Download } from 'lucide-react';
@@ -15,12 +15,12 @@ export const LogExplorer = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [severityFilter, setSeverityFilter] = useState<LogSeverity | ''>('');
 
-  const { data: logs, loading } = useFetch(() =>
+  const { data: logs, loading } = usePolling(() =>
     apiService.getLogs({
       severity: severityFilter || undefined,
       limit: 100,
     }),
-    [severityFilter]
+    10000
   );
 
   const filteredLogs = logs?.filter(

@@ -159,6 +159,11 @@ class ApiService {
     return res.data;
   }
 
+  async generateIncidentSummary(id: number): Promise<Incident> {
+    const res = await this.api.post<Incident>(`/incidents/${id}/generate-summary`);
+    return res.data;
+  }
+
   // Logs
   async getLogs(filters?: LogFilters): Promise<LogEntry[]> {
     const res = await this.api.get<{ logs: LogEntry[] } | LogEntry[]>('/logs', { params: filters });

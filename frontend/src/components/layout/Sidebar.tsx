@@ -8,7 +8,7 @@ const navigation = [
   { name: 'Monitoring', href: '/monitoring', icon: Activity },
   { name: 'Alerts', href: '/alerts', icon: AlertTriangle },
   { name: 'Incidents', href: '/incidents', icon: FileText },
-  { name: 'ML Analytics', href: '/ml-analytics', icon: Brain },
+  { name: 'Analytics', href: '/ml-analytics', icon: Brain },
   { name: 'Log Explorer', href: '/log-explorer', icon: Search },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];

@@ -11,39 +11,51 @@ from app.schemas.enums import LogSeverity, AlertSeverity, AlertStatus, IncidentS
 
 def get_dashboard_summary(db: Session) -> Dict:
     """Get high-level summary statistics for dashboard."""
+    from sqlalchemy import String, func
+
     # Total counts
-    total_logs = db.query(func.count(Log.id)).scalar()
-    total_alerts = db.query(func.count(Alert.id)).scalar()
-    total_incidents = db.query(func.count(Incident.id)).scalar()
+    total_logs = db.query(func.count(Log.id)).scalar() or 0
+    total_alerts = db.query(func.count(Alert.id)).scalar() or 0
+    total_incidents = db.query(func.count(Incident.id)).scalar() or 0
     
-    # Alert breakdown by severity
+    # Active Threats = Unresolved (OPEN / ACKNOWLEDGED) Critical & High alerts
+    active_threats_count = (
+        db.query(func.count(Alert.id))
+        .filter(
+            Alert.status.in_([AlertStatus.OPEN, AlertStatus.ACKNOWLEDGED]),
+            func.lower(func.cast(Alert.severity, String)).in_(["critical", "high"])
+        )
+        .scalar() or 0
+    )
+
+    # Alert breakdown by severity (case-insensitive)
     alert_severity_counts = {
-        "low": db.query(func.count(Alert.id)).filter(Alert.severity == AlertSeverity.LOW).scalar(),
-        "medium": db.query(func.count(Alert.id)).filter(Alert.severity == AlertSeverity.MEDIUM).scalar(),
-        "high": db.query(func.count(Alert.id)).filter(Alert.severity == AlertSeverity.HIGH).scalar(),
-        "critical": db.query(func.count(Alert.id)).filter(Alert.severity == AlertSeverity.CRITICAL).scalar(),
+        "low": db.query(func.count(Alert.id)).filter(func.lower(func.cast(Alert.severity, String)) == "low").scalar() or 0,
+        "medium": db.query(func.count(Alert.id)).filter(func.lower(func.cast(Alert.severity, String)) == "medium").scalar() or 0,
+        "high": db.query(func.count(Alert.id)).filter(func.lower(func.cast(Alert.severity, String)) == "high").scalar() or 0,
+        "critical": db.query(func.count(Alert.id)).filter(func.lower(func.cast(Alert.severity, String)) == "critical").scalar() or 0,
     }
     
     # Alert breakdown by status
     alert_status_counts = {
-        "open": db.query(func.count(Alert.id)).filter(Alert.status == AlertStatus.OPEN).scalar(),
-        "acknowledged": db.query(func.count(Alert.id)).filter(Alert.status == AlertStatus.ACKNOWLEDGED).scalar(),
-        "resolved": db.query(func.count(Alert.id)).filter(Alert.status == AlertStatus.RESOLVED).scalar(),
+        "open": db.query(func.count(Alert.id)).filter(Alert.status == AlertStatus.OPEN).scalar() or 0,
+        "acknowledged": db.query(func.count(Alert.id)).filter(Alert.status == AlertStatus.ACKNOWLEDGED).scalar() or 0,
+        "resolved": db.query(func.count(Alert.id)).filter(Alert.status == AlertStatus.RESOLVED).scalar() or 0,
     }
     
     # Incident breakdown by status
     incident_status_counts = {
-        "open": db.query(func.count(Incident.id)).filter(Incident.status == IncidentStatus.OPEN).scalar(),
-        "in-progress": db.query(func.count(Incident.id)).filter(Incident.status == IncidentStatus.IN_PROGRESS).scalar(),
-        "closed": db.query(func.count(Incident.id)).filter(Incident.status == IncidentStatus.CLOSED).scalar(),
+        "open": db.query(func.count(Incident.id)).filter(Incident.status == IncidentStatus.OPEN).scalar() or 0,
+        "in-progress": db.query(func.count(Incident.id)).filter(Incident.status == IncidentStatus.IN_PROGRESS).scalar() or 0,
+        "closed": db.query(func.count(Incident.id)).filter(Incident.status == IncidentStatus.CLOSED).scalar() or 0,
     }
     
     # Log breakdown by severity
     log_severity_counts = {
-        "info": db.query(func.count(Log.id)).filter(Log.severity == LogSeverity.INFO).scalar(),
-        "warning": db.query(func.count(Log.id)).filter(Log.severity == LogSeverity.WARNING).scalar(),
-        "error": db.query(func.count(Log.id)).filter(Log.severity == LogSeverity.ERROR).scalar(),
-        "critical": db.query(func.count(Log.id)).filter(Log.severity == LogSeverity.CRITICAL).scalar(),
+        "info": db.query(func.count(Log.id)).filter(func.lower(func.cast(Log.severity, String)) == "info").scalar() or 0,
+        "warning": db.query(func.count(Log.id)).filter(func.lower(func.cast(Log.severity, String)) == "warning").scalar() or 0,
+        "error": db.query(func.count(Log.id)).filter(func.lower(func.cast(Log.severity, String)) == "error").scalar() or 0,
+        "critical": db.query(func.count(Log.id)).filter(func.lower(func.cast(Log.severity, String)) == "critical").scalar() or 0,
     }
     
     return {
@@ -52,7 +64,8 @@ def get_dashboard_summary(db: Session) -> Dict:
         "total_incidents": total_incidents,
         "open_alerts": alert_status_counts["open"],
         "open_incidents": incident_status_counts["open"],
-        "critical_alerts": alert_severity_counts["critical"],
+        "active_threats": active_threats_count,
+        "critical_alerts": active_threats_count,
         "alerts_by_severity": alert_severity_counts,
         "alerts_by_status": alert_status_counts,
         "incidents_by_status": incident_status_counts,

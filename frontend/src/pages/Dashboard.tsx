@@ -3,13 +3,16 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { StatCard } from '@/components/dashboard/StatCard';
 import { SystemHealth } from '@/components/dashboard/SystemHealth';
 import { DonutChart, BarChartComponent } from '@/components/charts';
-import { useFetch } from '@/hooks';
+import { usePolling } from '@/hooks';
 import { apiService } from '@/services/api';
 import { Spinner } from '@/components/ui/Spinner';
+import { useSettingsStore } from '@/store';
 
 export const Dashboard = () => {
-  const { data: summary, loading } = useFetch(() => apiService.getDashboardSummary());
-  const { data: health } = useFetch(() => apiService.checkHealth());
+  const { settings } = useSettingsStore();
+  const pollInterval = settings.auto_refresh ? (settings.refresh_interval || 5000) : 0;
+  const { data: summary, loading } = usePolling(() => apiService.getDashboardSummary(), pollInterval);
+  const { data: health } = usePolling(() => apiService.checkHealth(), pollInterval);
 
   if (loading) {
     return (
@@ -47,12 +50,15 @@ export const Dashboard = () => {
       ]
     : [];
 
-  const healthData = health?.components ?? {
-    database: false,
-    elasticsearch: false,
-    kafka: false,
-    spark: false,
-    ml_model: false,
+  const raw = health?.components;
+  const healthData = {
+    database: Boolean(raw?.database ?? false),
+    elasticsearch: typeof raw?.elasticsearch === 'object'
+      ? Boolean((raw.elasticsearch as any)?.healthy)
+      : Boolean(raw?.elasticsearch ?? false),
+    kafka: Boolean(raw?.kafka ?? false),
+    spark: Boolean(raw?.spark ?? false),
+    ml_model: Boolean(raw?.ml_model ?? false),
   };
 
   return (
@@ -72,7 +78,7 @@ export const Dashboard = () => {
           />
           <StatCard
             title="Active Threats"
-            value={summary?.critical_alerts || 0}
+            value={summary?.active_threats ?? summary?.critical_alerts ?? 0}
             icon={AlertTriangle}
             iconColor="text-severity-critical"
           />

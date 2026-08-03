@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
-import { apiService } from '@/services/api';
-import { useNotificationStore, useSettingsStore } from '@/store';
+import { useState, useEffect, useCallback, useRef } from 'react';
+
+import { useNotificationStore } from '@/store';
 
 export const useFetch = <T,>(
   fetchFn: () => Promise<T>,
@@ -39,36 +39,38 @@ export const useFetch = <T,>(
 
 export const usePolling = <T,>(
   fetchFn: () => Promise<T>,
-  interval: number = 30000
+  interval: number = 5000
 ) => {
   const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // true only on first fetch
   const [error, setError] = useState<string | null>(null);
-  const { settings } = useSettingsStore();
+  const fetchFnRef = useRef(fetchFn);
+  fetchFnRef.current = fetchFn;
+
+  const execute = useCallback(async (isFirst: boolean) => {
+    try {
+      if (isFirst) setLoading(true);
+      const result = await fetchFnRef.current();
+      setData(result);
+      setError(null);
+    } catch (err: any) {
+      setError(err.response?.data?.detail || err.message);
+    } finally {
+      if (isFirst) setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetch = async () => {
-      try {
-        setLoading(true);
-        const result = await fetchFn();
-        setData(result);
-        setError(null);
-      } catch (err: any) {
-        setError(err.response?.data?.detail || err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetch();
-
-    if (settings.auto_refresh) {
-      const timer = setInterval(fetch, settings.refresh_interval || interval);
+    execute(true); // first load — show spinner once
+    if (interval > 0) {
+      const timer = setInterval(() => execute(false), interval); // subsequent — silent
       return () => clearInterval(timer);
     }
-  }, [interval, settings.auto_refresh, settings.refresh_interval]);
+  }, [interval, execute]);
 
-  return { data, loading, error };
+  const refetch = useCallback(() => execute(false), [execute]);
+
+  return { data, loading, error, refetch };
 };
 
 export const useDebounce = <T,>(value: T, delay: number = 500): T => {

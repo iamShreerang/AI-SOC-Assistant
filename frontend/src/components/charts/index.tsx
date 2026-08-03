@@ -27,11 +27,11 @@ export const DonutChart = ({ data, title }: DonutChartProps) => (
           <Pie
             data={data}
             cx="50%"
-            cy="50%"
-            innerRadius={60}
-            outerRadius={100}
+            cy="45%"
+            innerRadius={55}
+            outerRadius={85}
+            paddingAngle={2}
             dataKey="value"
-            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
           >
             {data.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={entry.color || COLORS.cyan} />
@@ -42,7 +42,13 @@ export const DonutChart = ({ data, title }: DonutChartProps) => (
               backgroundColor: '#1f2937',
               border: '1px solid #374151',
               borderRadius: '0.5rem',
+              color: '#f9fafb',
             }}
+          />
+          <Legend
+            verticalAlign="bottom"
+            height={36}
+            formatter={(value) => <span className="text-soc-text-secondary text-sm px-1">{value}</span>}
           />
         </PieChart>
       </ResponsiveContainer>

@@ -34,23 +34,10 @@ function App() {
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    const initAuth = async () => {
-      const accessToken = localStorage.getItem('access_token');
-      const refreshToken = localStorage.getItem('refresh_token');
-      
-      if (accessToken && refreshToken && !isAuthenticated) {
-        try {
-          const user = await apiService.getCurrentUser();
-          setAuth(user, { access_token: accessToken, refresh_token: refreshToken });
-        } catch (error) {
-          clearAuth();
-        }
-      }
-      setIsInitializing(false);
-    };
-    
-    initAuth();
-  }, [isAuthenticated, setAuth, clearAuth]);
+    // Clear any stale local storage tokens on app initialization to disable auto-login
+    localStorage.removeItem('auth-store');
+    setIsInitializing(false);
+  }, []);
 
   if (isInitializing) {
     return (
