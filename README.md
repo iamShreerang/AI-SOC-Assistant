@@ -336,7 +336,6 @@ python -m pytest streaming/tests/ -v
 | `big-data` | Kafka + Spark pipeline |
 | `ai-ml` | Machine learning models |
 | `frontend` | React dashboard |
-| `database` | Schema and migrations |
 
 Feature branches: `feature/<module>/<short-task-name>`
 
