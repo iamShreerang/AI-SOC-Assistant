@@ -104,67 +104,88 @@ AI-SOC-Assistant/
 
 ## Prerequisites
 
-| Tool | Version |
-|---|---|
-| Python | 3.11+ |
-| Node.js | 20+ |
-| Docker + Docker Compose | 24+ |
-| Java (for Spark local mode) | 11 or 17 |
+| Tool | Version | Notes |
+|---|---|---|
+| **Git** | 2.x+ | Repository cloning |
+| **Python** | 3.11+ | Backend & ML model execution |
+| **Node.js** | 20+ | React frontend dashboard |
+| **Docker Desktop** | 24+ | Kafka & ZooKeeper containers |
+| **Java (JDK)** | 11 or 17 | Required for PySpark stream processing |
 
 ---
 
-## Environment Setup
+## Complete Setup Guide (Fresh PC Installation)
 
-### Backend `.env`
+### Step 0 — Clone the Repository
 
-Copy `backend/.env.example.new` → `backend/.env` and fill in:
-
-```env
-DATABASE_URL=postgresql://user:password@localhost:5432/soc_db
-SECRET_KEY=your-secret-key
-GROQ_API_KEY=gsk_...            # Get from console.groq.com
-ELASTICSEARCH_ENABLED=false     # Set true only if Elasticsearch is running
-KAFKA_BROKER=localhost:9092
-AUTO_INCIDENT_SUMMARY=true      # Auto-generate Groq summary on incident creation
+```bash
+git clone https://github.com/iamShreerang/AI-SOC-Assistant.git
+cd AI-SOC-Assistant
 ```
 
-### Streaming `.env`
+---
 
-Copy `streaming/.env.example` → `streaming/.env`:
+### Step 1 — Configure Environment Files
+
+#### 1. Backend Environment Configuration
+Copy `backend/.env.example` to `backend/.env`:
+
+```bash
+cp backend/.env.example backend/.env   # Linux/macOS
+# or copy manually on Windows
+```
+
+Configure your PostgreSQL / Supabase connection in `backend/.env`:
+
+```env
+DATABASE_URL=postgresql://postgres:your_password@localhost:5432/soc_db
+SECRET_KEY=your-secret-key-min-32-chars
+GROQ_API_KEY=gsk_...            # (Optional) Get free key from console.groq.com
+EVALUATION_MODE=false
+EVALUATION_PASSWORD_HASH_CHECK=false
+```
+
+#### 2. Streaming Environment Configuration
+Copy `streaming/.env.example` to `streaming/.env`:
 
 ```env
 KAFKA_BROKER=localhost:9092
 KAFKA_INPUT_TOPIC=unsw-logs
 BACKEND_API_URL=http://localhost:8000
-MODEL_DIR=../ml/saved_models
 ```
 
 ---
 
-## Running the Project
-
-### Step 1 — Backend
+### Step 2 — Backend Setup & Database Migrations
 
 ```bash
 cd backend
 
-# Create and activate virtual environment
+# 1. Create and activate virtual environment
 python -m venv venv
 venv\Scripts\activate          # Windows
 # source venv/bin/activate     # macOS/Linux
 
+# 2. Install Python dependencies
 pip install -r requirements.txt
 
-# Start the FastAPI server
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# 3. Apply Database Migrations (Creates all DB tables)
+alembic upgrade head
+
+# 4. Launch FastAPI Backend Server
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Backend API: http://localhost:8000  
-Swagger docs: http://localhost:8000/docs
+- **Backend API**: `http://localhost:8000`
+- **Interactive Swagger Docs**: `http://localhost:8000/docs`
+
+> **Default Accounts Available**:
+> - **Admin**: `username: admin` | `password: admin123`
+> - **Analyst**: `username: analyst` | `password: analyst123`
 
 ---
 
-### Step 2 — Frontend
+### Step 3 — Frontend Dashboard Setup
 
 ```bash
 cd frontend
@@ -172,57 +193,52 @@ npm install
 npm run dev
 ```
 
-Dashboard: http://localhost:5173
+Dashboard UI: http://localhost:5173
 
 ---
 
-### Step 3 — Kafka + Docker (for full streaming pipeline)
+### Step 4 — Infrastructure Setup (Kafka + Docker)
 
 ```bash
 cd streaming
 
-# Start Zookeeper, Kafka, Kafka UI, and optionally Postgres + backend
+# Start Zookeeper, Kafka, Kafka UI
 docker compose up -d zookeeper kafka kafka-init kafka-ui
-
-# Verify Kafka is ready (Kafka UI at http://localhost:8080)
 ```
 
-> **Note:** The `unsw-logs` and `predictions` topics are created automatically by the `kafka-init` container.
+> **Note:** The `unsw-logs` and `predictions` Kafka topics are created automatically by the `kafka-init` container.
 
 ---
 
-### Step 4 — Spark Streaming Consumer
+### Step 5 — Spark Streaming Pipeline
 
-> **Requires:** Java 11 or 17, PySpark (`pip install pyspark==3.5.1`)
+> **Requires:** Java 11 or 17 (`JAVA_HOME` set)
 
 ```powershell
-# Windows PowerShell launcher (auto-configures project JDK 17 & Hadoop winutils):
-.\scripts\start_spark.ps1
-
-# Or run directly via Python:
-python streaming/spark/streaming_job.py
+# Run PySpark streaming job (consumes latest Kafka logs & performs ML inference):
+backend\venv\Scripts\python.exe streaming/spark/streaming_job.py
 ```
-
-The job will:
-- Connect to Kafka `unsw-logs` topic
-- Run CNN-LSTM inference on each batch
-- Apply 5 threat detection rules
-- POST logs + alerts to the FastAPI backend
-- POST a heartbeat to `/ingest/heartbeat` every 30 seconds
 
 ---
 
-### Step 5 — Kafka Producer
+### Step 6 — Log Generator & Kafka Producer
 
 ```bash
-# From repo root — publishes sample JSONL to Kafka once
-python streaming/kafka/producer.py
+# Stream UNSW-NB15 mock logs to Kafka at 5 records/sec:
+backend\venv\Scripts\python.exe streaming/sample_logs/generate.py --kafka --rate 5
 
-# Loop continuously (for sustained demo traffic)
-python streaming/kafka/producer.py --continuous
+# Custom broker, topic, or delay:
+backend\venv\Scripts\python.exe streaming/sample_logs/generate.py --kafka --broker localhost:9092 --topic unsw-logs --delay 0.2
+```
 
-# Custom broker or topic
-python streaming/kafka/producer.py --broker localhost:9092 --topic unsw-logs --delay 0.2
+---
+
+## Streaming State Reset & Clean Mode
+
+To wipe old micro-batch checkpoint files and reset the streaming state cleanly:
+
+```powershell
+backend\venv\Scripts\python.exe streaming/clean_stream.py
 ```
 
 ---
@@ -239,12 +255,12 @@ python streaming/run_local_pipeline.py
 python streaming/spark/streaming_job.py --local-test
 ```
 
-This reads `streaming/sample_logs/logs_real_unsw_sample.jsonl` directly through the same CNN-LSTM + threat rules + backend ingest pipeline as Kafka mode.
+This reads sample logs directly through the same CNN-LSTM + threat rules + backend ingest pipeline as Kafka mode.
 
-To generate more sample data:
+To generate more sample data files:
 
 ```bash
-python streaming/sample_logs/generate.py
+python streaming/sample_logs/generate.py --batch 200
 ```
 
 ---

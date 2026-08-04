@@ -18,13 +18,17 @@
 ### Authentication
 - ✅ Login with JWT
 - ✅ User Registration
-- ✅ Password Reset
+- ✅ Session Persistence Across Page Refreshes (F5 via `auth-storage`)
 - ✅ Role-based Access Control
 - ✅ Protected Routes
 
+### Global Search & Navigation
+- ✅ Unified Search Bar (`/search`) searching across Logs, Alerts, and Incidents
+- ✅ Quick Nav Dropdown with real-time query results
+
 ### Dashboard
-- ✅ Real-time Statistics
-- ✅ System Health Monitoring
+- ✅ Real-time Statistics & Active Threat Counters (Open High + Critical alerts)
+- ✅ System Health Heartbeat Monitoring (< 5s latency)
 - ✅ Interactive Charts
 - ✅ Alert Severity Distribution
 - ✅ Event Timeline

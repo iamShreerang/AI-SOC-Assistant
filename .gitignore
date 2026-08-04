@@ -259,6 +259,27 @@ frontend/.vite/
 ehthumbs.db
 Thumbs.db
 
-#ML Files
+# ML Files
 ml/data/
 **/__pycache__/
+
+# PySpark Checkpoints & Hadoop Caches
+streaming/checkpoint/
+**/checkpoint/
+/tmp/soc-checkpoint/
+.ivy2/
+
+# Generated Logs and Log Files
+*.log
+*.jsonl
+streaming/sample_logs/logs_*.jsonl
+!streaming/sample_logs/logs_real_unsw_sample.jsonl
+spark_test.log
+
+# Environments and Secrets
+.env
+backend/.env
+streaming/.env
+venv/
+backend/venv/
+.venv/

@@ -108,7 +108,7 @@ Content-Type: application/json
 
 #### Login
 
-**Request:**
+**Request (Supports both `application/json` and `application/x-www-form-urlencoded` for Swagger UI Authorize Modal):**
 ```json
 POST /auth/login
 Content-Type: application/json
